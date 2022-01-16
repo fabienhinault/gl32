@@ -108,18 +108,44 @@
         (vector->list
          (vector-filter (λ (_) (not (equal? 0 _))) gl32-indices-vector)))))
 
-(define gl32-graph-triangles
-  (filter (λ (_) (equal? 2 (length _))) gl32-graph-cycles))
 
+(define (move-left pred lst f-not-matching)
+  (let-values (((matchings notmatchings) (partition pred lst)))
+    (append matchings (f-not-matching notmatchings))))
+
+(define (x-invariant? n)
+  (equal? (arithmetic-shift n -6) 4))
+
+(define (x-invariant-car? cycle-list)
+  (x-invariant? (car cycle-list)))
+
+(define (y-invariant? n)
+  (equal? (modulo (arithmetic-shift n -3) 8) 2))
+
+(define (y-invariant-car? cycle-list)
+  (y-invariant? (car cycle-list)))
+
+(define (z-invariant? n)
+  (equal? (modulo n 8) 1))
+
+(define (z-invariant-car? cycle-list)
+  (z-invariant? (car cycle-list)))
+
+(define gl32-graph-triangles
+  (move-left x-invariant-car? (filter (λ (_) (equal? 2 (length _))) gl32-graph-cycles)
+             (λ (_) (move-left y-invariant-car? _
+                              (λ (_) (move-left z-invariant-car? _
+                                                 (λ (_) _)))))))
+             
 (define gl32-graph-not-triangles
   (sort (filter-not (λ (_) (equal? 2 (length _))) gl32-graph-cycles)
         (λ (l1 l2) (< (length l1) (length l2)))))
 
 (define (cycle->string cycle-list)
-  (string-append "I -- " (string-join (map ~a cycle-list) " -- ") ";"))
+  (string-append "273 -- " (string-join (map ~a cycle-list) " -- ") ";"))
 
 (define (triangle->string triangle-list)
-  (string-append (string-join (map ~a (reverse triangle-list)) " -- ") " --I;"))
+  (string-append (string-join (map ~a (reverse triangle-list)) " -- ") " -- 273;"))
 
 
 (for-each displayln (map triangle->string gl32-graph-triangles))
