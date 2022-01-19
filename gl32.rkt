@@ -2,6 +2,7 @@
 
 (require math/number-theory)
 (require math/matrix)
+(require math/array)
 (require rackunit)
 
 (define-syntax-rule (let1 a b body ...)
@@ -173,3 +174,32 @@
 
 (for-each displayln
           (map n->dot-struct-string gl32-integers))
+
+
+(define metapost-vars-array (array #[#[#["O" "Z"] #["Y" "YpZ"]] #[#["X" "XpZ"] #["XpY" "XpYpZ"]]]))
+
+(define triples (cartesian-product '(0 1) '(0 1) '(0 1)))
+
+(check-equal? (array-ref metapost-vars-array '#[0 1 1]) "YpZ")
+
+(define (metapost-dot-line gl32-matrix triple)
+  (let* ((triple-matrix (list->matrix 3 1 triple))
+         (triple-vector (list->vector triple))
+         (image-matrix (gl32* (matrix-transpose gl32-matrix) triple-matrix))
+         (image-vector (matrix->vector image-matrix)))
+    (when (not (equal? triple-matrix image-matrix))
+      (displayln
+       (string-append "  draw_arrow_pairs("
+                      (array-ref metapost-vars-array triple-vector)
+                      ", "
+                      (array-ref metapost-vars-array image-vector)
+                      ", margin);")))))
+
+(define (display-metapost-gl32-figure n)
+  (displayln (string-append "beginfig(" (~a n) ");"))
+  (displayln "  draw_dots;")
+  (for-each (λ (_) (metapost-dot-line (get-gl32-matrix n) _))
+            triples)
+  (displayln "endfig;"))
+
+(for-each display-metapost-gl32-figure gl32-integers)
