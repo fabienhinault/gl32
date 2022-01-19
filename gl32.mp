@@ -8,19 +8,23 @@ u := 1cm;
 dot_diam_front := 4pt; 
 dot_diam_back := 0.866dot_diam_front;
 margin := 3pt;
-perspective_ratio := 0.4;
-color front_color, back_color;
-front_color := black;
-back_color := 0.4 white;
+perspective_ratio := 0.4 * 1.414;
+perspective_angle := 30;
 pair O,X,Y,Z,XpY,XpZ,YpZ,XpYpZ;
 %O := origin;
 X := (u, 0);
 Z := (0, u);
-Y := perspective_ratio * (u, u);
+Y := perspective_ratio * u * dir(perspective_angle);
 XpY := X + Y;
 XpZ := X + Z;
 YpZ := Y + Z;
 XpYpZ := X + Y + Z;
+color front_color, back_color;
+front_color := black;
+back_color := 0.4 white;
+color colors[];
+colors0 = colors[u] = front_color;
+colors[xpart Y] = colors[xpart XpY] = back_color;
 
 def draw_arrow(expr xstart, ystart, xend, yend, margin) =
   pair v;
@@ -39,18 +43,18 @@ def draw_arrow_pairs(expr pstart, pend, margin) =
   rs = pstart + v;
   pair re;
   re = pend -v;
-  drawarrow rs--re withpen pencircle scaled 1.5pt;
+  drawarrow rs--re withpen pencircle scaled 1.5pt withcolor (colors[xpart pstart] + colors[xpart pend])/2;
 enddef;
 
 def draw_dots =
   drawdot(0, 0) withpen pencircle scaled dot_diam_front;
-  drawdot(0, u) withpen pencircle scaled dot_diam_front;
-  drawdot(u, 0) withpen pencircle scaled dot_diam_front;
-  drawdot(u, u) withpen pencircle scaled dot_diam_front;
-  drawdot(0.4u, 0.4u) withpen pencircle scaled dot_diam_back withcolor 0.4 white;
-  drawdot(00.4u, u+0.4u) withpen pencircle scaled dot_diam_back withcolor 0.4 white;
-  drawdot(u+0.4u, 0+0.4u) withpen pencircle scaled dot_diam_back withcolor 0.4 white;
-  drawdot(u+0.4u, u+0.4u) withpen pencircle scaled dot_diam_back withcolor 0.4 white;
+  drawdot X withpen pencircle scaled dot_diam_front;
+  drawdot Z withpen pencircle scaled dot_diam_front;
+  drawdot XpZ withpen pencircle scaled dot_diam_front;
+  drawdot Y withpen pencircle scaled dot_diam_back withcolor 0.4 white;
+  drawdot XpY withpen pencircle scaled dot_diam_back withcolor 0.4 white;
+  drawdot YpZ withpen pencircle scaled dot_diam_back withcolor 0.4 white;
+  drawdot XpYpZ withpen pencircle scaled dot_diam_back withcolor 0.4 white;
 enddef;
 
 beginfig(1);
