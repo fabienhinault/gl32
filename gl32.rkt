@@ -60,49 +60,109 @@
   
 
 (define m3z2 (map get-gl32-object(range 0 512)))
-(define gl32 (filter (λ (_) (not (equal? 0 (with-modulus 2 (mod (matrix-determinant (cdr(assoc 'matrix _)))))))) m3z2))
+;list of GL32 objects
+(define gl32-objects (filter (λ (_) (not (equal? 0 (with-modulus 2 (mod (matrix-determinant (cdr(assoc 'matrix _)))))))) m3z2))
 
-(check-equal? (length gl32) 168)
+(check-equal? (length gl32-objects) 168)
 
-(define gl32-integers (map (λ (_) (cdr(assoc 'n _))) gl32))
+(define gl32-integers (map (λ (_) (cdr(assoc 'n _))) gl32-objects))
 
 (define (gl32* m1 m2)
   (with-modulus 2 (matrix-map mod (matrix* m1 m2))))
 
+; powers of a GL32 matrix
 (define (get-gl32-powers m result)
   (let1 next (gl32* (car result) m)
         (if (equal? m next)
             (reverse (cdr result))
             (get-gl32-powers m (cons next result)))))
 
+;list of cycles as lists of integers
+;each element is:
+;  - integer of the matrix
+;  - length of the cycle (not counting identity)
+;  - cycle (omitting identity)
+;> powers
+;'((84 1 (84))
+;  (85 2 (85 340))
+;  ...
+;  (500 6 (500 335 229 187 426 94))
+;  (501 3 (501 266 494)))
 (define powers
   (map (λ (_)
          (let* ((m (cdr(assoc 'matrix _)))
                 (ps (get-gl32-powers m (list m)))
                 (ns (map gl32-matrix->n ps)))
            (list (cdr(assoc 'n _)) (length ns) ns )))
-       gl32))
+       gl32-objects))
 
 
+; vector of cycles as lists of integers
+;> gl32-cycles-vector
+;'#(0
+;   ...
+;   0
+;   (84)
+;   (85 340)
+;   ...
+;   (500 335 229 187 426 94)
+;   (501 266 494)
+;   0
+;   ...
+;   0)
 (define gl32-cycles-vector (make-vector 512))
 (for-each (λ (_) (vector-set! gl32-cycles-vector (car _) (caddr _)))
      powers)
 
+; util function to build cycles-vector and lengths-vector
 (define (add-cycle-element! cycle-element cycle-index cycle-length cycles-vector lengths-vector)
   (when (< (vector-ref lengths-vector cycle-element) cycle-length)
     (vector-set! cycles-vector cycle-element cycle-index)
     (vector-set! lengths-vector cycle-element cycle-length)))
 
+; util function to build cycles-vector and lengths-vector
 (define (add-cycle! cycle indices-vector lengths-vector)
   (map (λ (_)
          (add-cycle-element! _ (car cycle) (cadr cycle) indices-vector lengths-vector))
        (caddr cycle)))
 
+; for each integer i corresponding to a matrix in GL(3,2), (vector-ref gl32-indices-vector i)
+; will be the index of the first-found longest cycle
+;> gl32-indices-vector
+;'#(0
+;   ...
+;   0
+;   254  ; at rank 84
+;   ...
+;   494  ; at rank 501
+;   0
+;   ...
+;   0)
 (define gl32-indices-vector (make-vector 512))
+
+; for each integer i corresponding to a matrix in GL(3,2), (vector-ref gl32-lengths-vector i)
+; will be the index of the first-found longest cycle
+;> gl32-lengths-vector
+;'#(0
+;   ...
+;   0
+;   3  ; at rank 84
+;   ...
+;   3  ; at rank 501
+;   0
+;   ...
+;   0)
 (define gl32-lengths-vector (make-vector 512))
+
+; build gl32-indices-vector gl32-lengths-vector
 (for-each (λ (_) (add-cycle! _ gl32-indices-vector gl32-lengths-vector))
      powers)
 
+; list of all 57 de-duplicated cycles
+> gl32-graph-cycles
+'((254 84 443)
+  ...
+  (395 474))
 (define gl32-graph-cycles
   (map (λ (_) (vector-ref gl32-cycles-vector _))
        (remove-duplicates
