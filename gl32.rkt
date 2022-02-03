@@ -72,18 +72,17 @@
   (let1 mm2 (matrix-map mod2 m) 
         (list (cons ('n (gl32-matrix->n mm2))) (cons 'matrix mm2))))
 
-(define (gl32* . os)
-  (map matrix->gl32 (apply matrix* (map (λ (_) (assoc 'matrix _)) os))))
-
+(define (gl32* . gl32s)
+  (map matrix->gl32 (apply matrix* (map (λ (_) (assoc 'matrix _)) gl32s))))
 
 (define gl32-integers (map (λ (_) (cdr (assoc 'n _))) gl32-objects))
 
-(define (gl32* m1 m2)
-  (with-modulus 2 (matrix-map mod (matrix* m1 m2))))
+(define (gl32-matrix* m1 m2)
+  (matrix-map mod2 (matrix* m1 m2)))
 
 ; powers of a GL32 matrix
 (define (get-gl32-powers m result)
-  (let1 next (gl32* (car result) m)
+  (let1 next (gl32-matrix* (car result) m)
         (if (equal? m next)
             (reverse (cdr result))
             (get-gl32-powers m (cons next result)))))
@@ -180,22 +179,22 @@
         (vector->list
          (vector-filter (λ (_) (not (equal? 0 _))) gl32-indices-vector)))))
 
-(define transistion-matrices
+(define transition-matrices
    (map (λ (_) (list->matrix 3 3 _))
-        '(((0 1 0)(1 0 0)(0 0 1))
-          ((0 0 1)(0 1 0)(1 0 0))
-          ((1 0 0)(0 0 1)(0 1 0))
-          ((0 0 1)(1 0 0)(0 1 0))
-          ((0 1 0)(0 0 1)(1 0 0)))))
+        '((0 1 0  1 0 0  0 0 1)
+          (0 0 1  0 1 0  1 0 0)
+          (1 0 0  0 0 1  0 1 0)
+          (0 0 1  1 0 0  0 1 0)
+          (0 1 0  0 0 1  1 0 0))))
 
 ; same as transition-matrices, just swapping two last ones
-(define transistion-inverse-matrices
+(define transition-inverse-matrices
    (map (λ (_) (list->matrix 3 3 _))
-        '(((0 1 0)(1 0 0)(0 0 1))
-          ((0 0 1)(0 1 0)(1 0 0))
-          ((1 0 0)(0 0 1)(0 1 0))
-          ((0 1 0)(0 0 1)(1 0 0))
-          ((0 0 1)(1 0 0)(0 1 0)))))
+        '((0 1 0  1 0 0  0 0 1)
+          (0 0 1  0 1 0  1 0 0)
+          (1 0 0  0 0 1  0 1 0)
+          (0 1 0  0 0 1  1 0 0)
+          (0 0 1  1 0 0  0 1 0))))
 
 (define gl32-families-vector (make-vector 512))
 
@@ -205,8 +204,10 @@
                                transition-matrices)
         (remove-duplicates(append permuted-matrices (map matrix-transpose permuted-matrices)))))
 
-(for-each (λ (_) (vector-set! gl32-families-vector (car _) (caddr _)))
-     gl32-objects)
+(for-each (λ (_) (vector-set! gl32-families-vector
+                              (cdr (assoc 'n _))
+                              (build-family(cdr (assoc 'matrix _)))))
+          gl32-objects)
 
 (define (move-left pred lst f-not-matching)
   (let-values (((matchings notmatchings) (partition pred lst)))
@@ -283,7 +284,7 @@
 (define (metapost-dot-line gl32-matrix triple)
   (let* ((triple-matrix (list->matrix 3 1 triple))
          (triple-vector (list->vector triple))
-         (image-matrix (gl32* (matrix-transpose gl32-matrix) triple-matrix))
+         (image-matrix (gl32-matrix* (matrix-transpose gl32-matrix) triple-matrix))
          (image-vector (matrix->vector image-matrix)))
     (when (not (equal? triple-matrix image-matrix))
       (displayln
