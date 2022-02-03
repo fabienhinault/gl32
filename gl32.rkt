@@ -19,18 +19,18 @@
       result
       (bit-list (arithmetic-shift n -1) (- size 1) (cons (bitwise-bit-field n 0 1) result)))) 
 
-(check-equal? (bit-list 0 9 '())   '(0 0 0 0 0 0 0 0 0))
-(check-equal? (bit-list 1 9 '())   '(0 0 0 0 0 0 0 0 1))
-(check-equal? (bit-list 511 9 '()) '(1 1 1 1 1 1 1 1 1))
+(check-equal? (bit-list 0 9 '())   '(0 0 0  0 0 0  0 0 0))
+(check-equal? (bit-list 1 9 '())   '(0 0 0  0 0 0  0 0 1))
+(check-equal? (bit-list 511 9 '()) '(1 1 1  1 1 1  1 1 1))
 
 (define (bit-list->n list len result)
   (if (no? list)
       result
       (bit-list->n (cdr list) (- len 1) (+ (* 2 result) (car list)))))
 
-(check-equal? (bit-list->n '(0 0 0 0 0 0 0 0 0) 9 0) 0)
-(check-equal? (bit-list->n '(0 0 0 0 0 0 0 0 1) 9 0) 1)
-(check-equal? (bit-list->n '(1 1 1 1 1 1 1 1 1) 9 0) 511)
+(check-equal? (bit-list->n '(0 0 0  0 0 0  0 0 0) 9 0) 0)
+(check-equal? (bit-list->n '(0 0 0  0 0 0  0 0 1) 9 0) 1)
+(check-equal? (bit-list->n '(1 1 1  1 1 1  1 1 1) 9 0) 511)
 
 (define (group-by-n l group-size result)
   (if (no? l)
@@ -70,10 +70,16 @@
 
 (define (matrix->gl32 m)
   (let1 mm2 (matrix-map mod2 m) 
-        (list (cons ('n (gl32-matrix->n mm2))) (cons 'matrix mm2))))
+        (list (cons 'n (gl32-matrix->n mm2)) (cons 'matrix mm2))))
+
+(define (list->gl32 l)
+  (matrix->gl32 (list->matrix 3 3 l)))
 
 (define (gl32* . gl32s)
-  (map matrix->gl32 (apply matrix* (map (λ (_) (assoc 'matrix _)) gl32s))))
+  (matrix->gl32 (apply matrix* (map (λ (_) (cdr (assoc 'matrix _))) gl32s))))
+
+(define (gl32-transpose gl32-object)
+  (matrix->gl32 (matrix-transpose (cdr (assoc 'matrix gl32-object)))))
 
 (define gl32-integers (map (λ (_) (cdr (assoc 'n _))) gl32-objects))
 
@@ -179,8 +185,8 @@
         (vector->list
          (vector-filter (λ (_) (not (equal? 0 _))) gl32-indices-vector)))))
 
-(define transition-matrices
-   (map (λ (_) (list->matrix 3 3 _))
+(define transitions
+   (map list->gl32
         '((0 1 0  1 0 0  0 0 1)
           (0 0 1  0 1 0  1 0 0)
           (1 0 0  0 0 1  0 1 0)
@@ -188,8 +194,8 @@
           (0 1 0  0 0 1  1 0 0))))
 
 ; same as transition-matrices, just swapping two last ones
-(define transition-inverse-matrices
-   (map (λ (_) (list->matrix 3 3 _))
+(define transition-inverses
+   (map list->gl32
         '((0 1 0  1 0 0  0 0 1)
           (0 0 1  0 1 0  1 0 0)
           (1 0 0  0 0 1  0 1 0)
@@ -198,15 +204,15 @@
 
 (define gl32-families-vector (make-vector 512))
 
-(define (build-family m)
-  (let1 permuted-matrices (map (λ (_1 _2) (matrix* _1 m _2))
-                               transition-inverse-matrices
-                               transition-matrices)
-        (remove-duplicates(append permuted-matrices (map matrix-transpose permuted-matrices)))))
+(define (build-family gl32-object)
+  (let1 permuted-objects (map (λ (_1 _2) (gl32* _1 gl32-object _2))
+                               transition-inverses
+                               transitions)
+        (remove-duplicates (cons gl32-object (append permuted-objects (map gl32-transpose permuted-objects))))))
 
 (for-each (λ (_) (vector-set! gl32-families-vector
                               (cdr (assoc 'n _))
-                              (build-family(cdr (assoc 'matrix _)))))
+                              (build-family _)))
           gl32-objects)
 
 (define (move-left pred lst f-not-matching)
