@@ -53,6 +53,12 @@
 (define (n->gl32-object n)
   (list (cons 'n n) (cons 'matrix (get-gl32-matrix n))))
 
+(define (get-n o)
+  (cdr (assoc 'n o)))
+
+(define (get-matrix o)
+  (cdr (assoc 'matrix o)))
+
 (define (gl32-matrix->n m)
   (let1 l (matrix->list m)
         (bit-list->n l 9 0)))
@@ -210,10 +216,17 @@
                                transitions)
         (remove-duplicates (cons gl32-object (append permuted-objects (map gl32-transpose permuted-objects))))))
 
-(for-each (λ (_) (vector-set! gl32-families-vector
-                              (cdr (assoc 'n _))
-                              (build-family _)))
-          gl32-objects)
+(define (vector-set-family! v f)
+  (for-each
+   (λ (_) (vector-set! v (get-n _) f))
+   f))
+
+(for-each
+ (λ (_)
+   (let1 n (cdr (assoc 'n _))
+         (when (equal? 0 (vector-ref gl32-families-vector n))
+           (vector-set-family! gl32-families-vector (build-family _)))))
+ gl32-objects)
 
 (define (move-left pred lst f-not-matching)
   (let-values (((matchings notmatchings) (partition pred lst)))
