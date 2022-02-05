@@ -216,17 +216,55 @@
                                transitions)
         (remove-duplicates (cons gl32-object (append permuted-objects (map gl32-transpose permuted-objects))))))
 
+;for-each: all lists must have same size
+;  first list length: 3
+;  other list length: 1
+;  procedure: #<procedure:...rc/gl32/gl32.rkt:224:3>
+
+(define (gl32-family* f1 f2)
+  (let1 result
+        (build-family (gl32* (car f1) (car f2)))
+  (for-each
+   (λ (o1 o2 o-result)
+     (check-equal? (gl32* o1 o2) o-result))
+   f1
+   f2
+   result)
+  result))
+
+; powers of a GL32 family
+(define (get-gl32-family-powers f result)
+  (let1 next (gl32-family* (car result) f)
+        (if (equal? f next)
+            (reverse (cdr result))
+            (get-gl32-family-powers f (cons next result)))))
+
 (define (vector-set-family! v f)
   (for-each
    (λ (_) (vector-set! v (get-n _) f))
    f))
 
+(define (vector-set-family-powers-to-family-vector! vf  fp)
+  (for-each
+   (λ (_) (vector-set-family! vf _))
+   fp))
+
 (for-each
  (λ (_)
    (let1 n (cdr (assoc 'n _))
          (when (equal? 0 (vector-ref gl32-families-vector n))
-           (vector-set-family! gl32-families-vector (build-family _)))))
+           (vector-set-family-powers-to-family-vector! gl32-families-vector (get-gl32-family-powers (build-family _) (list (build-family _)))))))
  gl32-objects)
+
+
+;list of powers of all GL32 families
+(define family-powers
+  (map (λ (_)
+         (let* ((m (cdr(assoc 'matrix _)))
+                (ps (get-gl32-powers m (list m)))
+                (ns (map gl32-matrix->n ps)))
+           (list (cdr(assoc 'n _)) (length ns) ns )))
+       gl32-objects))
 
 (define (move-left pred lst f-not-matching)
   (let-values (((matchings notmatchings) (partition pred lst)))
