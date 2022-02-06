@@ -84,6 +84,9 @@
 (define (gl32* . gl32s)
   (matrix->gl32 (apply matrix* (map (λ (_) (cdr (assoc 'matrix _))) gl32s))))
 
+(define (gl32-square o)
+  (gl32* o o))
+
 (define (gl32-transpose gl32-object)
   (matrix->gl32 (matrix-transpose (cdr (assoc 'matrix gl32-object)))))
 
@@ -208,6 +211,13 @@
           (0 1 0  0 0 1  1 0 0)
           (0 0 1  1 0 0  0 1 0))))
 
+(for-each
+ (λ (_orig _inverse)
+   (check-equal? (matrix-map mod2 (matrix-inverse (get-matrix _orig)))
+                 (get-matrix _inverse)))
+ transitions
+ transition-inverses)
+
 (define gl32-families-vector (make-vector 512))
 
 (define (build-family gl32-object)
@@ -216,27 +226,33 @@
                                transitions)
         (remove-duplicates (cons gl32-object (append permuted-objects (map gl32-transpose permuted-objects))))))
 
-;for-each: all lists must have same size
-;  first list length: 3
-;  other list length: 1
-;  procedure: #<procedure:...rc/gl32/gl32.rkt:224:3>
+(define gl32-family-identity (list (n->gl32-object 273)))
 
 (define (gl32-family* f1 f2)
   (let1 result
         (build-family (gl32* (car f1) (car f2)))
-  (for-each
-   (λ (o1 o2 o-result)
-     (check-equal? (gl32* o1 o2) o-result))
-   f1
-   f2
-   result)
-  result))
+        (when (not (equal? result gl32-family-identity))
+          (check-equal? (length result) (length f1) (string-append "not same length: " (~a f1) "\n" (~a result)))
+          (for-each
+           (λ (o1 o2 o-result)
+             (check-equal? (gl32* o1 o2) o-result))
+           f1
+           f2
+           result))
+        result))
+
+(let1 _84 (build-family (n->gl32-object 84))
+      (check-equal? gl32-family-identity  (gl32-family* _84 _84)))
+
+
+(let1 _86 (build-family (n->gl32-object 84))
+      (check-equal? gl32-family-identity  (gl32-family* _86 _86)))
 
 ; powers of a GL32 family
 (define (get-gl32-family-powers f result)
   (let1 next (gl32-family* (car result) f)
-        (if (equal? f next)
-            (reverse (cdr result))
+        (if (equal? gl32-family-identity next)
+            (reverse result)
             (get-gl32-family-powers f (cons next result)))))
 
 (define (vector-set-family! v f)
