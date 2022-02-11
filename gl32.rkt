@@ -257,6 +257,7 @@
   (get-permuted-objects gl32-object transitions-inverses transitions))
 
 (define gl32-families-vector (make-vector 512))
+(define gl32-families-lengths-vector (make-vector 512))
 
 (define (_build-family result-objects
                       result-transitions
@@ -272,7 +273,7 @@
               (cons 'transitions-inverses (reverse result-transitions-inverses))
               (cons 'gl32s
                     (reverse
-                     (if (gl32-symetrical? (car result-objects))
+                     (if (member (gl32-transpose (car result-objects)) result-objects)
                          result-objects
                          (append (map gl32-transpose result-objects) result-objects))))))
       (let1 next (car permuted-objects)
@@ -318,7 +319,7 @@
         gl32-family-identity
         (let1 result (_build-family (list first1*2) '() '()
                                    (_get-gl32-powers first1*2 (list first1*2))
-                                   (get-permuted-objects first1*2 (get-transitions f1) (get-transitions-inverses f1))
+                                   (get-permuted-objects first1*2 (get-transitions-inverses f1) (get-transitions f1))
                                    (get-transitions f1)
                                    (get-transitions-inverses f1))
               (check-equal? (length (get-gl32s result)) (length (get-gl32s f1))
@@ -326,7 +327,7 @@
               (for-each
                (λ (o1 o2 o-result)
                  (check-equal? (gl32* o1 o2) o-result
-                               (string-append "wrong product in: " (~a f1) " * " (~a f2) "\n" (~a result))))
+                               (string-append "wrong product in: " (~a (get-n (car (get-gl32s f1)))) " * " (~a (get-n (car (get-gl32s f2)))) "\n" (~a result))))
                (get-gl32s f1)
                (get-gl32s f2)
                (get-gl32s result))
@@ -357,21 +358,29 @@
             (reverse result)
             (get-gl32-family-powers f (cons next result)))))
 
-(define (vector-set-family! v f)
+(define (vector-set-family! vf f vl l)
   (for-each
-   (λ (gl32-object) (vector-set! v (get-n gl32-object) f))
+   (λ (gl32-object)
+     (let1 n (get-n gl32-object)
+           (vector-set! vf n f)
+           (vector-set! vl n l)))
    (get-gl32s f)))
 
-(define (vector-set-family-powers-to-family-vector! vf  fp)
-  (for-each
-   (λ (family) (vector-set-family! vf family))
-   fp))
+(define (vector-set-family-powers-to-family-vector! vf fp vl)
+  (let1 l (length fp)
+        (for-each
+         (λ (family) (vector-set-family! vf family vl l))
+         fp)))
 
 (for-each
  (λ (gl32-object)
-   (let1 n (cdr (assoc 'n gl32-object))
-         (when (equal? 0 (vector-ref gl32-families-vector n))
-           (vector-set-family-powers-to-family-vector! gl32-families-vector (get-gl32-family-powers (build-family gl32-object) (list (build-family gl32-object)))))))
+   (let* ((n (cdr (assoc 'n gl32-object)))
+          (fp (get-gl32-family-powers (build-family gl32-object) (list (build-family gl32-object))))
+          (l (length fp)))
+         (when (< (vector-ref gl32-families-lengths-vector n) l)
+           (vector-set-family-powers-to-family-vector! gl32-families-vector
+                                                       fp
+                                                       gl32-families-lengths-vector))))
  gl32-objects)
 
 
