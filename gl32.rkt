@@ -53,6 +53,12 @@
 (define (n->gl32-object n)
   (list (cons 'n n) (cons 'matrix (get-gl32-matrix n))))
 
+(define gl32-identity (n->gl32-object 273))
+
+(define _84 (n->gl32-object 84))
+(define _85 (n->gl32-object 85))
+(define _86 (n->gl32-object 86))
+
 (define (get-n o)
   (cdr (assoc 'n o)))
 
@@ -90,17 +96,38 @@
 (define (gl32-transpose gl32-object)
   (matrix->gl32 (matrix-transpose (cdr (assoc 'matrix gl32-object)))))
 
+(define (gl32-symetrical? gl32-object)
+  (matrix= (get-matrix gl32-object) (matrix-transpose (get-matrix gl32-object))))
+
+(check-true (gl32-symetrical? (n->gl32-object 273)))
+(check-true (gl32-symetrical? (n->gl32-object 84)))
+(check-true (gl32-symetrical? (n->gl32-object 85)))
+(check-false (gl32-symetrical? _86))
+
 (define gl32-integers (map (λ (_) (cdr (assoc 'n _))) gl32-objects))
 
 (define (gl32-matrix* m1 m2)
   (matrix-map mod2 (matrix* m1 m2)))
 
 ; powers of a GL32 matrix
-(define (get-gl32-powers m result)
+(define (get-gl32-matrix-powers m result)
   (let1 next (gl32-matrix* (car result) m)
         (if (equal? m next)
             (reverse (cdr result))
-            (get-gl32-powers m (cons next result)))))
+            (get-gl32-matrix-powers m (cons next result)))))
+
+
+; powers of a GL32 object
+(define (_get-gl32-powers gl32-object result)
+  (let1 next (gl32* (car result) gl32-object)
+        (if (equal? gl32-identity next)
+            (reverse result)
+            (_get-gl32-powers gl32-object (cons next result)))))
+
+(check-equal? (length (_get-gl32-powers _84 (list _84))) 1)
+
+(define (get-gl32-powers gl32-object)
+  (_get-gl32-powers gl32-object (list gl32-object)))
 
 ;list of cycles as lists of integers
 ;each element is:
@@ -116,7 +143,7 @@
 (define powers
   (map (λ (_)
          (let* ((m (cdr(assoc 'matrix _)))
-                (ps (get-gl32-powers m (list m)))
+                (ps (get-gl32-matrix-powers m (list m)))
                 (ns (map gl32-matrix->n ps)))
            (list (cdr(assoc 'n _)) (length ns) ns )))
        gl32-objects))
@@ -203,7 +230,7 @@
           (0 1 0  0 0 1  1 0 0))))
 
 ; same as transition-matrices, just swapping two last ones
-(define transition-inverses
+(define transitions-inverses
    (map list->gl32
         '((0 1 0  1 0 0  0 0 1)
           (0 0 1  0 1 0  1 0 0)
@@ -211,42 +238,117 @@
           (0 1 0  0 0 1  1 0 0)
           (0 0 1  1 0 0  0 1 0))))
 
-(for-each
- (λ (_orig _inverse)
-   (check-equal? (matrix-map mod2 (matrix-inverse (get-matrix _orig)))
-                 (get-matrix _inverse)))
- transitions
- transition-inverses)
+(define (check-inverses ts tis)
+  (for-each
+   (λ (_orig _inverse)
+     (check-equal? (matrix-map mod2 (matrix-inverse (get-matrix _orig)))
+                   (get-matrix _inverse)))
+   ts
+   tis))
+
+(check-inverses transitions transitions-inverses)
+
+(define (get-permuted-objects gl32-object tis ts)
+  (map (λ (_1 _2) (gl32* _1 gl32-object _2))
+       tis
+       ts))
+
+(define (get-all-permuted-objects gl32-object)
+  (get-permuted-objects gl32-object transitions-inverses transitions))
 
 (define gl32-families-vector (make-vector 512))
 
-(define (build-family gl32-object)
-  (let1 permuted-objects (map (λ (_1 _2) (gl32* _1 gl32-object _2))
-                               transition-inverses
-                               transitions)
-        (remove-duplicates (cons gl32-object (append permuted-objects (map gl32-transpose permuted-objects))))))
+(define (_build-family result-objects
+                      result-transitions
+                      result-transitions-inverses
+                      powers
+                      permuted-objects
+                      remaining-transitions
+                      remaining-transitions-inverses)
+  (if (no? permuted-objects)
+      (begin
+        (check-inverses result-transitions result-transitions-inverses)
+        (list (cons 'transitions (reverse result-transitions))
+              (cons 'transitions-inverses (reverse result-transitions-inverses))
+              (cons 'gl32s
+                    (reverse
+                     (if (gl32-symetrical? (car result-objects))
+                         result-objects
+                         (append (map gl32-transpose result-objects) result-objects))))))
+      (let1 next (car permuted-objects)
+            (if (member next powers)
+                (_build-family result-objects
+                              result-transitions
+                              result-transitions-inverses
+                              powers (cdr permuted-objects)
+                              (cdr remaining-transitions)
+                              (cdr remaining-transitions-inverses))
+                (_build-family (cons next result-objects)
+                              (cons (car remaining-transitions) result-transitions)
+                              (cons (car remaining-transitions-inverses) result-transitions-inverses)
+                              (append powers (_get-gl32-powers next (list next)))
+                              (cdr permuted-objects)
+                              (cdr remaining-transitions)
+                              (cdr remaining-transitions-inverses))))))
 
-(define gl32-family-identity (list (n->gl32-object 273)))
+(define (build-family gl32-object)
+  (_build-family (list gl32-object)
+                      '()
+                      '()
+                      (_get-gl32-powers gl32-object (list gl32-object))
+                      (get-all-permuted-objects gl32-object)
+                      transitions
+                      transitions-inverses))
+  
+(define gl32-family-identity (list (cons 'gl32s (list gl32-identity)) (cons 'transitions '())))
+
+(define (get-gl32s family) (cdr (assoc 'gl32s family)))
+(define (get-transitions family) (cdr (assoc 'transitions family)))
+(define (get-transitions-inverses family) (cdr (assoc 'transitions-inverses family)))
+(define (gl32-family-symetrical? family) (gl32-symetrical? (car (get-gl32s family))))
+
 
 (define (gl32-family* f1 f2)
-  (let1 result
-        (build-family (gl32* (car f1) (car f2)))
-        (when (not (equal? result gl32-family-identity))
-          (check-equal? (length result) (length f1) (string-append "not same length: " (~a f1) "\n" (~a result)))
-          (for-each
-           (λ (o1 o2 o-result)
-             (check-equal? (gl32* o1 o2) o-result))
-           f1
-           f2
-           result))
-        result))
+  (check-equal? (get-transitions f1) (get-transitions f2))
+  (check-equal? (get-transitions-inverses f1) (get-transitions-inverses f2))
+  (let* ((first1 (car (get-gl32s f1)))
+         (first2 (car (get-gl32s f2)))
+         (first1*2 (gl32* first1 first2)))
+    (if (equal? first1*2 gl32-identity)
+        gl32-family-identity
+        (let1 result (_build-family (list first1*2) '() '()
+                                   (_get-gl32-powers first1*2 (list first1*2))
+                                   (get-permuted-objects first1*2 (get-transitions f1) (get-transitions-inverses f1))
+                                   (get-transitions f1)
+                                   (get-transitions-inverses f1))
+              (check-equal? (length (get-gl32s result)) (length (get-gl32s f1))
+                            (string-append "not same length: " (~a f1) "\n" (~a result)))
+              (for-each
+               (λ (o1 o2 o-result)
+                 (check-equal? (gl32* o1 o2) o-result
+                               (string-append "wrong product in: " (~a f1) " * " (~a f2) "\n" (~a result))))
+               (get-gl32s f1)
+               (get-gl32s f2)
+               (get-gl32s result))
+              result))))
 
-(let1 _84 (build-family (n->gl32-object 84))
-      (check-equal? gl32-family-identity  (gl32-family* _84 _84)))
 
+(let* ((_84  (n->gl32-object 84))
+       (__84 (_build-family (list _84) '() '()
+                            (get-all-permuted-objects _84)
+                            (_get-gl32-powers _84 (list _84))
+                            transitions
+                            transitions-inverses)))
+      (check-equal? gl32-family-identity  (gl32-family* __84 __84)))
 
-(let1 _86 (build-family (n->gl32-object 84))
-      (check-equal? gl32-family-identity  (gl32-family* _86 _86)))
+(let* ((_86  (n->gl32-object 86))
+       (_403 (n->gl32-object 403))
+       (transitions (list (n->gl32-object 161)  (n->gl32-object 266)))
+       (__86 (build-family  _86)))
+      (check-equal?
+       (gl32-family* __86 __86)
+       (_build-family (list _403) '() '() (get-gl32-powers _403) (get-permuted-objects _403 transitions transitions) transitions transitions)))
+  
 
 ; powers of a GL32 family
 (define (get-gl32-family-powers f result)
@@ -257,19 +359,19 @@
 
 (define (vector-set-family! v f)
   (for-each
-   (λ (_) (vector-set! v (get-n _) f))
-   f))
+   (λ (gl32-object) (vector-set! v (get-n gl32-object) f))
+   (get-gl32s f)))
 
 (define (vector-set-family-powers-to-family-vector! vf  fp)
   (for-each
-   (λ (_) (vector-set-family! vf _))
+   (λ (family) (vector-set-family! vf family))
    fp))
 
 (for-each
- (λ (_)
-   (let1 n (cdr (assoc 'n _))
+ (λ (gl32-object)
+   (let1 n (cdr (assoc 'n gl32-object))
          (when (equal? 0 (vector-ref gl32-families-vector n))
-           (vector-set-family-powers-to-family-vector! gl32-families-vector (get-gl32-family-powers (build-family _) (list (build-family _)))))))
+           (vector-set-family-powers-to-family-vector! gl32-families-vector (get-gl32-family-powers (build-family gl32-object) (list (build-family gl32-object)))))))
  gl32-objects)
 
 
@@ -277,7 +379,7 @@
 (define family-powers
   (map (λ (_)
          (let* ((m (cdr(assoc 'matrix _)))
-                (ps (get-gl32-powers m (list m)))
+                (ps (get-gl32-matrix-powers m (list m)))
                 (ns (map gl32-matrix->n ps)))
            (list (cdr(assoc 'n _)) (length ns) ns )))
        gl32-objects))
