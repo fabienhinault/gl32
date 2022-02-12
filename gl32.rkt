@@ -96,9 +96,11 @@
   (cdr (assoc 'matrix o)))
 
 
-(define m3z2 (map n->gl32-object(range 0 512)))
+(define m3z2 (map n->gl32-object (range 0 512)))
+(define m3z2-vector (apply vector m3z2))
 ;list of GL32 objects
-(define gl32-objects (filter (λ (_) (not (equal? 0 (with-modulus 2 (mod (matrix-determinant (cdr(assoc 'matrix _)))))))) m3z2))
+(define gl32-objects (filter (λ (_) (odd? (matrix-determinant (cdr (assoc 'matrix _))))) m3z2))
+(define gl32-vector (vector-map (λ (_) (if (odd? (matrix-determinant (cdr (assoc 'matrix _)))) _ 0)) m3z2-vector))
 
 (check-equal? (length gl32-objects) 168)
 
@@ -189,9 +191,9 @@
          (add-cycle-element! _ (car cycle) (cadr cycle) indices-vector lengths-vector))
        (caddr cycle)))
 
-; for each integer i corresponding to a matrix in GL(3,2), (vector-ref gl32-indices-vector i)
+; for each integer i corresponding to a matrix in GL(3,2), (vector-ref gl32-cycle-indices-vector i)
 ; will be the index of the first-found longest cycle
-;> gl32-indices-vector
+;> gl32-cycle-indices-vector
 ;'#(0
 ;   ...
 ;   0
@@ -201,7 +203,7 @@
 ;   0
 ;   ...
 ;   0)
-(define gl32-indices-vector (make-vector 512))
+(define gl32-cycle-indices-vector (make-vector 512))
 
 ; for each integer i corresponding to a matrix in GL(3,2), (vector-ref gl32-lengths-vector i)
 ; will be the index of the first-found longest cycle
@@ -217,8 +219,8 @@
 ;   0)
 (define gl32-lengths-vector (make-vector 512))
 
-; build gl32-indices-vector gl32-lengths-vector
-(for-each (λ (_) (add-cycle! _ gl32-indices-vector gl32-lengths-vector))
+; build gl32-cycle-indices-vector gl32-lengths-vector
+(for-each (λ (_) (add-cycle! _ gl32-cycle-indices-vector gl32-lengths-vector))
      powers)
 
 ; list of all 57 de-duplicated cycles
@@ -230,7 +232,7 @@
   (map (λ (_) (vector-ref gl32-cycles-vector _))
        (remove-duplicates
         (vector->list
-         (vector-filter (λ (_) (not (equal? 0 _))) gl32-indices-vector)))))
+         (vector-filter (λ (_) (not (equal? 0 _))) gl32-cycle-indices-vector)))))
 
 ;;;;;;
 ; families
@@ -334,7 +336,9 @@
          (first2 (car (get-gl32s f2)))
          (first1*2 (gl32* first1 first2)))
     (if (equal? first1*2 gl32-identity)
-        gl32-family-identity
+        (begin
+          (for-each (λ (o1 o2) (check-equal? (gl32* o1 o2) gl32-identity)) (cdr (get-gl32s f1)) (cdr (get-gl32s f2)))
+          gl32-family-identity)
         (let1 result (_build-family (list first1*2) '() '()
                                    (_get-gl32-powers first1*2 (list first1*2))
                                    (get-permuted-objects first1*2 (get-transitions-inverses f1) (get-transitions f1))
@@ -515,9 +519,9 @@
 
 (check-equal? (gl32-family->dot-struct-string '(98)) "98 [label=\"{ | |█}|{█| | }|{ |█| }\"];")
 
-(for-each displayln (map gl32-family->dot-struct-string (remove-duplicates (vector->list-not-0 gl32-families-as-ns-vector))))
-(for-each displayln (map family-triangle->string gl32-families-graph-triangles))
-(for-each displayln (map family-cycle->string gl32-families-graph-not-triangles))
+;(for-each displayln (map gl32-family->dot-struct-string (remove-duplicates (vector->list-not-0 gl32-families-as-ns-vector))))
+;(for-each displayln (map family-triangle->string gl32-families-graph-triangles))
+;(for-each displayln (map family-cycle->string gl32-families-graph-not-triangles))
 
 ;;;;;;;;;;;;;;;;;
 ; metapost functions
@@ -528,24 +532,52 @@
 
 (check-equal? (array-ref metapost-vars-array '#[0 1 1]) "YpZ")
 
-(define (metapost-dot-line gl32-matrix triple)
+(define (triple-vectors gl32-matrix triple)
   (let* ((triple-matrix (list->matrix 3 1 triple))
-         (triple-vector (list->vector triple))
-         (image-matrix (gl32-matrix* (matrix-transpose gl32-matrix) triple-matrix))
-         (image-vector (matrix->vector image-matrix)))
-    (when (not (equal? triple-matrix image-matrix))
-      (displayln
-       (string-append "  draw_arrow_pairs("
-                      (array-ref metapost-vars-array triple-vector)
-                      ", "
-                      (array-ref metapost-vars-array image-vector)
-                      ", margin);")))))
+         (image-matrix (gl32-matrix* (matrix-transpose gl32-matrix) triple-matrix)))
+      (cons (list->vector triple) (matrix->vector image-matrix))))
+
+(define (y-sum triple-vector-pair)
+  (+ (vector-ref (car triple-vector-pair) 1)
+     (vector-ref (cdr triple-vector-pair) 1)))
+
+(check-equal? (y-sum '(#(0 0 1) . #(1 0 1))) 0)
+(check-equal? (y-sum '(#(0 1 1) . #(1 1 1))) 2)
+
+(define (sort-by-Y-desc triple-vector-pairs)
+  (sort triple-vector-pairs
+        (λ (p1 p2) (> (y-sum p1) (y-sum p2)))))
+
+(check-equal?
+ (let1 matrix85 (get-gl32-matrix 85)
+       (sort-by-Y-desc
+        (filter (λ (_) (not (equal? (car _) (cdr _))))
+                (map (λ (_) (triple-vectors matrix85 _))
+                     triples))))
+ '((#(0 1 1) . #(1 1 1))
+   (#(1 1 0) . #(0 1 1))
+   (#(1 1 1) . #(1 1 0))
+   (#(0 0 1) . #(1 0 1))
+   (#(1 0 0) . #(0 0 1))
+   (#(1 0 1) . #(1 0 0))))
+
+(define (metapost-dot-line triple-vector-pairs)
+  (string-append "  draw_arrow_pairs("
+                 (array-ref metapost-vars-array (car triple-vector-pairs))
+                 ", "
+                 (array-ref metapost-vars-array (cdr triple-vector-pairs))
+                 ", margin);"))
 
 (define (display-metapost-gl32-figure n)
-  (displayln (string-append "beginfig(" (~a n) ");"))
-  (displayln "  draw_dots;")
-  (for-each (λ (_) (metapost-dot-line (get-gl32-matrix n) _))
-            triples)
-  (displayln "endfig;"))
+  (let1 matrix (get-gl32-matrix n)
+        (displayln (string-append "beginfig(" (~a n) ");"))
+        (displayln "  draw_dots;")
+        (for-each displayln
+                  (map metapost-dot-line
+                       (sort-by-Y-desc
+                        (filter (λ (_) (not (equal? (car _) (cdr _))))
+                                (map (λ (_) (triple-vectors matrix _))
+                                     triples)))))
+        (displayln "endfig;")))
 
-;(for-each display-metapost-gl32-figure gl32-integers)
+(for-each display-metapost-gl32-figure gl32-integers)
