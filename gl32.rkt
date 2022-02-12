@@ -14,6 +14,12 @@
 (define (mod2 n)
   (modulo n 2))
 
+(define (length< l1 l2)
+  (< (length l1) (length l2)))
+
+(define (vector->list-not-0 v)
+  (vector->list (vector-filter (λ (_) (not (equal? 0 _))) v)))
+
 (define (bit-list n size result)
   (if (equal? size 0)
       result
@@ -416,6 +422,11 @@
    (vector->list
     (vector-filter (λ (_) (not (equal? 0 _))) gl32-families-cycles-as-ns-vector))))
 
+(define gl32-families-graph-triangles
+  (filter (λ (_) (equal? 2 (length _))) gl32-families-graph-cycles))
+
+(define gl32-families-graph-not-triangles
+  (sort (filter (λ (_) (< 2 (length _))) gl32-families-graph-cycles) length<))
 
 ;;;;;;
 ; util fonctions for printing cycle graph
@@ -452,6 +463,12 @@
   (sort (filter-not (λ (_) (equal? 2 (length _))) gl32-graph-cycles)
         (λ (l1 l2) (< (length l1) (length l2)))))
 
+(define (family-cycle->string cycle-list)
+  (string-append "273 -- " (string-join (map ~a (map car cycle-list)) " -- ") ";"))
+
+(define (family-triangle->string triangle-list)
+  (string-append (string-join (map ~a (reverse (map car triangle-list))) " -- ") " -- 273;"))
+
 (define (cycle->string cycle-list)
   (string-append "273 -- " (string-join (map ~a cycle-list) " -- ") ";"))
 
@@ -474,16 +491,36 @@
 
 (check-equal? (row->dot-struct-string '(0 1 0)) "{ |█| }")
 
+(define (matrix-list->dot-struct-string matrix-list)
+  (string-join (map row->dot-struct-string matrix-list) "|"))
+
 (define (n->dot-struct-string n)
-  (let1 matrix-list (n->matrix-list n)
-        (string-append
-         (~a n)
-         " [label=\""
-         (string-join (map row->dot-struct-string matrix-list) "|")
-         "\"];")))
+  (string-append
+   (~a n)
+   " [label=\""
+   (matrix-list->dot-struct-string (n->matrix-list n))
+   "\"];"))
+
+(check-equal? (n->dot-struct-string 98) "98 [label=\"{ | |█}|{█| | }|{ |█| }\"];")
 
 ;(for-each displayln (map n->dot-struct-string gl32-integers))
 
+(define (gl32-family->dot-struct-string ns)
+  (string-append
+   (~a (car ns))
+   " [label=\""
+   (string-join (map (λ (n) (matrix-list->dot-struct-string (n->matrix-list n))) ns) "|{&nbsp;&nbsp;}|")
+   "\"];"))
+
+
+(check-equal? (gl32-family->dot-struct-string '(98)) "98 [label=\"{ | |█}|{█| | }|{ |█| }\"];")
+
+(for-each displayln (map gl32-family->dot-struct-string (remove-duplicates (vector->list-not-0 gl32-families-as-ns-vector))))
+(for-each displayln (map family-triangle->string gl32-families-graph-triangles))
+(for-each displayln (map family-cycle->string gl32-families-graph-not-triangles))
+
+;;;;;;;;;;;;;;;;;
+; metapost functions
 
 (define metapost-vars-array (array #[#[#["O" "Z"] #["Y" "YpZ"]] #[#["X" "XpZ"] #["XpY" "XpYpZ"]]]))
 
