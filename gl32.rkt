@@ -80,6 +80,8 @@
 (define _84 (n->gl32-object 84))
 (define _85 (n->gl32-object 85))
 (define _86 (n->gl32-object 86))
+(define _98 (n->gl32-object 98))
+(define _140 (n->gl32-object 140))
 
 (define (get-n o)
   (cdr (assoc 'n o)))
@@ -277,17 +279,18 @@
               (cons 'transitions-inverses (reverse result-transitions-inverses))
               (cons 'gl32s
                     (reverse
-                     (if (member (gl32-transpose (car result-objects)) result-objects)
+                     (if (member (gl32-transpose (car result-objects)) powers)
                          result-objects
                          (append (map gl32-transpose result-objects) result-objects))))))
       (let1 next (car permuted-objects)
             (if (member next powers)
                 (_build-family result-objects
-                              result-transitions
-                              result-transitions-inverses
-                              powers (cdr permuted-objects)
-                              (cdr remaining-transitions)
-                              (cdr remaining-transitions-inverses))
+                               result-transitions
+                               result-transitions-inverses
+                               powers
+                               (cdr permuted-objects)
+                               (cdr remaining-transitions)
+                               (cdr remaining-transitions-inverses))
                 (_build-family (cons next result-objects)
                               (cons (car remaining-transitions) result-transitions)
                               (cons (car remaining-transitions-inverses) result-transitions-inverses)
@@ -304,6 +307,7 @@
                       (get-all-permuted-objects gl32-object)
                       transitions
                       transitions-inverses))
+
   
 (define gl32-family-identity (list (cons 'gl32s (list gl32-identity)) (cons 'transitions '())))
 
@@ -314,6 +318,8 @@
 (define (gl32-family-symetrical? family) (gl32-symetrical? (car (get-gl32s family))))
 (define (gl32-family->ns family) (map get-n (get-gl32s family)))
 
+
+(check-equal? (get-gl32s (build-family _98)) (list _98))
 
 (define (gl32-family* f1 f2)
   (check-equal? (get-transitions f1) (get-transitions f2))
@@ -453,8 +459,8 @@
   (string-append (string-join (map ~a (reverse triangle-list)) " -- ") " -- 273;"))
 
 
-(for-each displayln (map triangle->string gl32-graph-triangles))
-(for-each displayln (map cycle->string gl32-graph-not-triangles))
+;(for-each displayln (map triangle->string gl32-graph-triangles))
+;(for-each displayln (map cycle->string gl32-graph-not-triangles))
 
 (define dot-struct-string-replacement-vector (vector " " "█"))
 
@@ -476,8 +482,7 @@
          (string-join (map row->dot-struct-string matrix-list) "|")
          "\"];")))
 
-(for-each displayln
-          (map n->dot-struct-string gl32-integers))
+;(for-each displayln (map n->dot-struct-string gl32-integers))
 
 
 (define metapost-vars-array (array #[#[#["O" "Z"] #["Y" "YpZ"]] #[#["X" "XpZ"] #["XpY" "XpYpZ"]]]))
@@ -506,4 +511,4 @@
             triples)
   (displayln "endfig;"))
 
-(for-each display-metapost-gl32-figure gl32-integers)
+;(for-each display-metapost-gl32-figure gl32-integers)
