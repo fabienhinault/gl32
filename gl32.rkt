@@ -1,5 +1,7 @@
 #lang racket
 
+; https://personal.math.vt.edu/brown/doc/PSL(2,7)_GL(3,2).pdf
+
 (require math/number-theory)
 (require math/matrix)
 (require math/array)
@@ -54,6 +56,7 @@
 
 (check-equal? (get-gl32-matrix 0)   (matrix [[0 0 0] [0 0 0] [0 0 0]]))
 (check-equal? (get-gl32-matrix 1)   (matrix ((0 0 0) (0 0 0) (0 0 1))))
+;84 = 64 + 16 + 4 = 2**6 + 2**4 + 2**2
 (check-equal? (get-gl32-matrix 84)  (matrix ((0 0 1) (0 1 0) (1 0 0))))
 
 (define (gl32-matrix->n m)
@@ -95,7 +98,7 @@
 (define (get-matrix o)
   (cdr (assoc 'matrix o)))
 
-
+; M_3(ZZ_2) the set of all square matrices of dimension 3 in ZZ_2
 (define m3z2 (map n->gl32-object (range 0 512)))
 (define m3z2-vector (apply vector m3z2))
 ;list of GL32 objects
@@ -129,6 +132,119 @@
 (check-false (gl32-symetrical? _86))
 
 (define gl32-integers (map (λ (_) (cdr (assoc 'n _))) gl32-objects))
+
+;F8
+(define (f8-vector->n v)
+  (+ (vector-ref v 0) (* 2 (vector-ref v 1)) (* 4 (vector-ref v 2))))
+(check-equal? (f8-vector->n #[0 0 0]) 0)
+(check-equal? (f8-vector->n #[1 0 0]) 1)
+(check-equal? (f8-vector->n #[0 1 0]) 2)
+(check-equal? (f8-vector->n #[1 1 0]) 3)
+(check-equal? (f8-vector->n #[0 0 1]) 4)
+(check-equal? (f8-vector->n #[1 0 1]) 5)
+(check-equal? (f8-vector->n #[0 1 1]) 6)
+(check-equal? (f8-vector->n #[1 1 1]) 7)
+
+(define (n->f8-vector n)
+  (build-vector 3 (λ (_) (bitwise-bit-field n _ (+ _ 1)))))
+(check-equal? #[0 0 0] (n->f8-vector 0))
+(check-equal? #[1 0 0] (n->f8-vector 1))
+(check-equal? #[0 1 0] (n->f8-vector 2))
+(check-equal? #[1 1 0] (n->f8-vector 3))
+(check-equal? #[0 0 1] (n->f8-vector 4))
+(check-equal? #[1 0 1] (n->f8-vector 5))
+(check-equal? #[0 1 1] (n->f8-vector 6))
+(check-equal? #[1 1 1] (n->f8-vector 7))
+
+(define (f8-object vector symbol power)
+  (let1 alist (list (cons 'vector vector)
+                    (cons 'vector-n (f8-vector->n vector))
+                    (cons 'symbol symbol)
+                    (cons 'power power)
+                    (cons 'ref0? (λ (i) (equal? 0 (vector-ref vector i)))))
+        (λ (arg) (cdr (assoc arg alist)))))
+(define (f8==? _1 _2)
+  (equal? (_1 'vector) (_2 'vector)))
+
+(define _f8-0 (f8-object #[0 0 0] '0 '∞))
+(define _f8-1 (f8-object #[1 0 0] '1 '0))
+(define _f8-X (f8-object #[0 1 0] 'X '1))
+(define _f8-X2 (f8-object #[0 0 1] 'X2 '2))
+(define _f8-X+1 (f8-object #[1 1 0] 'X+1 '3))
+(define _f8-X2+X (f8-object #[0 1 1] 'X2+X '4))
+(define _f8-X2+X+1 (f8-object #[1 1 1] 'X2+X+1 '5))
+(define _f8-X2+1 (f8-object #[1 0 1] 'X2+1 '6))
+
+(check-equal? (_f8-X2+1 'vector) #[1 0 1])
+(check-true (f8==? _f8-0 (f8-object #[0 0 0] '0 '∞)))
+(check-true ((_f8-X2+1 'ref0?) 1))
+(check-false ((_f8-X2+1 'ref0?) 0))
+(check-false ((_f8-X2+1 'ref0?) 2))
+
+(define f8-powers (vector _f8-1 _f8-X _f8-X2 _f8-X+1 _f8-X2+X _f8-X2+X+1 _f8-X2+1))
+
+(define f8-vectors (make-vector 8))
+(vector-set! f8-vectors 0 _f8-0)
+(for-each
+ (λ (_) (vector-set! f8-vectors (f8-vector->n (_ 'vector)) _))
+ (vector->list f8-powers))
+(check-true (f8==? (vector-ref f8-vectors 6) _f8-X2+X))
+
+
+(define (f8+ . f8s)
+  (vector-ref f8-vectors (f8-vector->n (vector-map mod2 (foldl (λ vs (apply vector-map + vs)) #[0 0 0] (map (λ (_) (_ 'vector)) f8s))))))
+(check-true (f8==? (f8+ _f8-0 _f8-0) _f8-0))
+(check-true (f8==? (f8+ _f8-0 _f8-1) _f8-1))
+(check-true (f8==? (f8+ _f8-X _f8-0) _f8-X))
+(check-true (f8==? (f8+ _f8-X2+X+1 _f8-X2+1) _f8-X))
+
+(define (_f8*powers power1 power2)
+  (vector-ref f8-powers (+ power1 power2)))
+
+(define (f8* _1 _2)
+  (if (or (f8==? _1 _f8-0) (f8==? _2 _f8-0))
+      _f8-0
+      (apply f8+ (flatten (map (λ (i1)
+                                 (map (λ (i2)
+                                        (if (or ((_1 'ref0?) i1) ((_2 'ref0?) i2))
+                                            _f8-0
+                                            (_f8*powers i1 i2)))
+                                      (range 3)))
+                               (range 3))))))
+(check-true (f8==? (f8* _f8-0 _f8-0) _f8-0))
+(check-true (f8==? (f8* _f8-0 _f8-1) _f8-0))
+(check-true (f8==? (f8* _f8-X _f8-0) _f8-0))
+(check-true (f8==? (f8* _f8-1 _f8-1) _f8-1))
+(check-true (f8==? (f8* _f8-X _f8-1) _f8-X))
+(check-true (f8==? (f8* _f8-1 _f8-X2) _f8-X2))
+(check-true (f8==? (f8* _f8-X2+X+1 _f8-X2+1) _f8-X2+X))
+
+(define (gl32-f8 ogl32 of8)
+  (vector-ref
+   f8-vectors
+   (f8-vector->n (matrix->vector (gl32-matrix* (get-matrix ogl32) (vector->matrix 3 1 (of8 'vector)))))))
+
+(check-true (f8==? (gl32-f8 _84 _f8-0) _f8-0))
+(check-true (f8==? (gl32-f8 _84 _f8-1) _f8-X2))
+(check-true (f8==? (gl32-f8 _84 _f8-X2) _f8-1))
+(check-true (f8==? (gl32-f8 _84 _f8-X+1) _f8-X2+X))
+(check-true (f8==? (gl32-f8 _84 _f8-X2+X) _f8-X+1))
+(check-true (f8==? (gl32-f8 _84 _f8-X) _f8-X))
+(check-true (f8==? (gl32-f8 _84 _f8-X2+1) _f8-X2+1))
+(check-true (f8==? (gl32-f8 _84 _f8-X2+X+1) _f8-X2+X+1))
+
+(check-true (f8==? (gl32-f8 _85 _f8-0) _f8-0))
+(check-true (f8==? (gl32-f8 _85 _f8-1) _f8-X2))
+(check-true (f8==? (gl32-f8 _85 _f8-X2) _f8-X2+1))
+(check-true (f8==? (gl32-f8 _85 _f8-X2+1) _f8-1))
+(check-true (f8==? (gl32-f8 _85 _f8-X) _f8-X))
+(check-true (f8==? (gl32-f8 _85 _f8-X+1) _f8-X2+X))
+(check-true (f8==? (gl32-f8 _85 _f8-X2+X) _f8-X2+X+1))
+(check-true (f8==? (gl32-f8 _85 _f8-X2+X+1) _f8-X+1))
+
+;SL(2,7)
+
+
 
 ; powers of a GL32 object
 (define (_get-gl32-powers gl32-object result)
@@ -349,7 +465,13 @@
               (for-each
                (λ (o1 o2 o-result)
                  (check-equal? (gl32* o1 o2) o-result
-                               (string-append "wrong product in: " (~a (get-n (car (get-gl32s f1)))) " * " (~a (get-n (car (get-gl32s f2)))) "\n" (~a result))))
+                               (string-append
+                                "wrong product in: "
+                                (~a (get-n (car (get-gl32s f1))))
+                                " * "
+                                (~a (get-n (car (get-gl32s f2))))
+                                "\n"
+                                (~a result))))
                (get-gl32s f1)
                (get-gl32s f2)
                (get-gl32s result))
@@ -580,4 +702,4 @@
                                      triples)))))
         (displayln "endfig;")))
 
-(for-each display-metapost-gl32-figure gl32-integers)
+;(for-each display-metapost-gl32-figure gl32-integers)
