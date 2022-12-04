@@ -511,6 +511,8 @@
 
 (define dot-struct-string-replacement-vector (vector " " "█"))
 
+(define dot-html-string-replacement-vector (vector "" " BGCOLOR=\"black\""))
+
 (define (row->dot-struct-string row)
   (string-append
    "{"
@@ -521,8 +523,30 @@
 
 (check-equal? (row->dot-struct-string '(0 1 0)) "{ |█| }")
 
+(define dot-square-length "18")
+(define (row->dot-html-string row)
+  (string-append
+   "<tr>"
+   (apply string-append
+          (map (λ (coef)
+                 (string-append
+                  "<td HEIGHT=\""
+                  dot-square-length
+                  "\" WIDTH=\""
+                  dot-square-length
+                  "\""
+                  (vector-ref dot-html-string-replacement-vector coef)
+                  "></td>"))
+                     row))
+   "</tr>"))
+
+(check-equal? (row->dot-html-string '(0 1 0)) "<tr><td HEIGHT=\"18\" WIDTH=\"18\"></td><td HEIGHT=\"18\" WIDTH=\"18\" BGCOLOR=\"black\"></td><td HEIGHT=\"18\" WIDTH=\"18\"></td></tr>")
+
 (define (matrix-list->dot-struct-string matrix-list)
   (string-join (map row->dot-struct-string matrix-list) "|"))
+
+(define (matrix-list->dot-html-string matrix-list)
+  (apply string-append (map row->dot-html-string matrix-list)))
 
 (define (n->dot-struct-string n)
   (string-append
@@ -532,6 +556,21 @@
    "\"];"))
 
 (check-equal? (n->dot-struct-string 98) "98 [label=\"{ | |█}|{█| | }|{ |█| }\"];")
+
+(define (n->dot-html-string n)
+  (string-append
+   (~a n)
+   " [label=<<table BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">"
+   (matrix-list->dot-html-string (n->matrix-list n))
+   "</table>>];"))
+
+(check-equal? (n->dot-html-string 98)
+              (string-append
+               "98 [label=<<table BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">"
+               "<tr><td HEIGHT=\"18\" WIDTH=\"18\"></td><td HEIGHT=\"18\" WIDTH=\"18\"></td><td HEIGHT=\"18\" WIDTH=\"18\" BGCOLOR=\"black\"></td></tr>"
+               "<tr><td HEIGHT=\"18\" WIDTH=\"18\" BGCOLOR=\"black\"></td><td HEIGHT=\"18\" WIDTH=\"18\"></td><td HEIGHT=\"18\" WIDTH=\"18\"></td></tr>"
+               "<tr><td HEIGHT=\"18\" WIDTH=\"18\"></td><td HEIGHT=\"18\" WIDTH=\"18\" BGCOLOR=\"black\"></td><td HEIGHT=\"18\" WIDTH=\"18\"></td></tr></table>>];"
+               ))
 
 ;(for-each displayln (map n->dot-struct-string gl32-integers))
 
