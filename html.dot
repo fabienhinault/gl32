@@ -1,0 +1,26 @@
+strict graph structs {
+    node [shape=plaintext];
+# { | |█}|{ |█| }|{█| | }
+84 [label=<<table BORDER="0" CELLBORDER="1" CELLSPACING="0">
+<tr><td HEIGHT="18" WIDTH="18"></td>
+<td HEIGHT="18" WIDTH="18"></td>
+<td HEIGHT="18" WIDTH="18" BGCOLOR="black"></td></tr>
+<tr><td  HEIGHT="18" WIDTH="18" ></td>
+<td HEIGHT="18" WIDTH="18" BGCOLOR="black"></td>
+<td HEIGHT="18" WIDTH="18"></td></tr>
+<tr><td HEIGHT="18" WIDTH="18" BGCOLOR="black"></td>
+<td HEIGHT="18" WIDTH="18"></td>
+<td HEIGHT="18" WIDTH="18" ></td></tr></table>>];
+#{ | |█}|{ |█| }|{█| |█}
+85 [label=<<table BORDER="0" CELLBORDER="1" CELLSPACING="0">
+<tr><td HEIGHT="18" WIDTH="18"></td>
+<td HEIGHT="18" WIDTH="18"></td>
+<td HEIGHT="18" WIDTH="18" BGCOLOR="black"></td></tr>
+<tr><td  HEIGHT="18" WIDTH="18" ></td>
+<td HEIGHT="18" WIDTH="18" BGCOLOR="black"></td>
+<td HEIGHT="18" WIDTH="18"></td></tr>
+<tr><td HEIGHT="18" WIDTH="18" BGCOLOR="black"></td>
+<td HEIGHT="18" WIDTH="18"></td>
+<td HEIGHT="18" WIDTH="18" BGCOLOR="black"></td></tr></table>>];
+84--85;
+}
