@@ -594,6 +594,12 @@
 (define metapost-vars-array (array #[#[#["O" "Z"] #["Y" "YpZ"]] #[#["X" "XpZ"] #["XpY" "XpYpZ"]]]))
 
 (define triples (cartesian-product '(0 1) '(0 1) '(0 1)))
+(check-equal? triples '((0 0 0) (0 0 1) (0 1 0) (0 1 1) (1 0 0) (1 0 1) (1 1 0) (1 1 1)))
+
+(check-equal?
+ (map (λ(_) (array-ref metapost-vars-array (list->vector _)))
+      triples)
+ '("O" "Z" "Y" "YpZ" "X" "XpZ" "XpY" "XpYpZ"))
 
 (check-equal? (array-ref metapost-vars-array '#[0 1 1]) "YpZ")
 
@@ -633,16 +639,33 @@
                  (array-ref metapost-vars-array (cdr triple-vector-pairs))
                  ", margin);"))
 
+(define (metapost-dot n)
+  (let1 matrix (get-gl32-matrix n)
+        (string-append "  draw_dots("
+                       (string-join
+                        (map
+                         (λ(_)
+                           (array-ref metapost-vars-array
+                                      (matrix->vector
+                                       (gl32-matrix*
+                                        (matrix-transpose matrix)
+                                        (list->matrix 3 1 _)))))
+                         (cdr triples))
+                        ", ")
+                       ");")))
+  
+
+
 (define (display-metapost-gl32-figure n)
   (let1 matrix (get-gl32-matrix n)
         (displayln (string-append "beginfig(" (~a n) ");"))
-        (displayln "  draw_dots;")
         (for-each displayln
                   (map metapost-dot-line
                        (sort-by-Y-desc
                         (filter (λ (_) (not (equal? (car _) (cdr _))))
                                 (map (λ (_) (triple-vectors matrix _))
                                      triples)))))
+        (displayln (metapost-dot n))
         (displayln "endfig;")))
 
-;(for-each display-metapost-gl32-figure gl32-integers)
+(for-each display-metapost-gl32-figure gl32-integers)
