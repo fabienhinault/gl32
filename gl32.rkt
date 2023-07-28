@@ -102,6 +102,7 @@
 (define _86 (n->gl32-object 86))
 (define _98 (n->gl32-object 98))
 (define _140 (n->gl32-object 140))
+(define _273 (n->gl32-object 273))
 
 (define (get-n o)
   (cdr (assoc 'n o)))
@@ -198,11 +199,12 @@
 
 ;vector of f8 objects by powers
 ;                         X^0   X^1   X^2    X^3     X^4      X^5        X^6
-(define f8-powers (vector _f8-1 _f8-X _f8-X2 _f8-X+1 _f8-X2+X _f8-X2+X+1 _f8-X2+1))
-(define (get-f8-power k)
+(define f8-by-powers (vector _f8-1 _f8-X _f8-X2 _f8-X+1 _f8-X2+X _f8-X2+X+1 _f8-X2+1))
+(define (get-f8-by-power k)
   (if (equal? k ∞)
       _f8-0
-      (vector-ref f8-powers k)))
+      (vector-ref f8-by-powers k)))
+
 (define f8-decomposition
   (list (cons _f8-0 (list _f8-0))
         (cons _f8-1 (list _f8-1))
@@ -221,7 +223,7 @@
 (vector-set! f8-vectors 0 _f8-0)
 (for-each
  (λ (_) (vector-set! f8-vectors (_ 'vector-n) _))
- (vector->list f8-powers))
+ (vector->list f8-by-powers))
 (check-true (f8==? (vector-ref f8-vectors 6) _f8-X2+X))
 
 (define (vector3+ . vector3s)
@@ -239,7 +241,7 @@
 (check-true (f8==? (f8+ _f8-X2+X+1 _f8-X2+1) _f8-X))
 
 (define (_f8*powers power1 power2)
-  (vector-ref f8-powers (+ power1 power2)))
+  (vector-ref f8-by-powers (+ power1 power2)))
 
 (define (f8* _1 _2)
   (if (or (f8==? _1 _f8-0) (f8==? _2 _f8-0))
@@ -260,6 +262,22 @@
 (check-true (f8==? (f8* _f8-X _f8-1) _f8-X))
 (check-true (f8==? (f8* _f8-1 _f8-X2) _f8-X2))
 (check-true (f8==? (f8* _f8-X2+X+1 _f8-X2+1) _f8-X2+X))
+
+
+(define f8-powers-3d-array
+        (array #[#[#[∞ 2] #[1 4]] #[#[0 6] #[3 5]]]))
+
+(define f8-3d-array
+        (array-map get-f8-by-power f8-powers-3d-array))
+
+(check-equal? (array-ref f8-3d-array #(0 0 0)) _f8-0)
+(check-equal? (array-ref f8-3d-array #(1 0 0)) _f8-1)
+(check-equal? (array-ref f8-3d-array #(0 1 0)) _f8-X)
+(check-equal? (array-ref f8-3d-array #(0 0 1)) _f8-X2)
+(check-equal? (array-ref f8-3d-array #(1 1 0)) _f8-X+1)
+(check-equal? (array-ref f8-3d-array #(1 0 1)) _f8-X2+1)
+(check-equal? (array-ref f8-3d-array #(0 1 1)) _f8-X2+X)
+(check-equal? (array-ref f8-3d-array #(1 1 1)) _f8-X2+X+1)
 
 (define (gl32-f8 ogl32 of8)
   (vector-ref
@@ -283,6 +301,13 @@
 (check-true (f8==? (gl32-f8 _85 _f8-X+1) _f8-X2+X))
 (check-true (f8==? (gl32-f8 _85 _f8-X2+X) _f8-X2+X+1))
 (check-true (f8==? (gl32-f8 _85 _f8-X2+X+1) _f8-X+1))
+
+(define (T-1 ogl32)
+  (λ (f7bar-nb)
+    (array-ref f8-powers-3d-array
+               (matrix->vector (gl32-matrix* (get-matrix ogl32)
+                                             (vector->matrix
+                                              3 1 ((get-f8-by-power f7bar-nb) 'vector)))))))
 
 ;PSL(2,7)
 
@@ -339,7 +364,7 @@
 (check-equal? (sf2-3663 ∞) 4) ; 3/6 = -3 = 4
 
 (define (_sf2->glf8-k sf2)
-  (λ (k) (f8+ (get-f8-power (sf2 k)) (get-f8-power (sf2 ∞)))))
+  (λ (k) (f8+ (get-f8-by-power (sf2 k)) (get-f8-by-power (sf2 ∞)))))
 
 (define _glf8-k-3663 (_sf2->glf8-k sf2-3663))
 (define (check-f8==? v1 v2)
@@ -540,7 +565,8 @@
                      row))
    "</tr>"))
 
-(check-equal? (row->dot-html-string '(0 1 0)) "<tr><td HEIGHT=\"18\" WIDTH=\"18\"></td><td HEIGHT=\"18\" WIDTH=\"18\" BGCOLOR=\"black\"></td><td HEIGHT=\"18\" WIDTH=\"18\"></td></tr>")
+(check-equal? (row->dot-html-string '(0 1 0))
+              "<tr><td HEIGHT=\"18\" WIDTH=\"18\"></td><td HEIGHT=\"18\" WIDTH=\"18\" BGCOLOR=\"black\"></td><td HEIGHT=\"18\" WIDTH=\"18\"></td></tr>")
 
 (define (matrix-list->dot-struct-string matrix-list)
   (string-join (map row->dot-struct-string matrix-list) "|"))
@@ -668,4 +694,4 @@
         (displayln (metapost-dot n))
         (displayln "endfig;")))
 
-(for-each display-metapost-gl32-figure gl32-integers)
+;(for-each display-metapost-gl32-figure gl32-integers)
