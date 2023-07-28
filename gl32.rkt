@@ -102,6 +102,7 @@
 (define _86 (n->gl32-object 86))
 (define _98 (n->gl32-object 98))
 (define _140 (n->gl32-object 140))
+(define _273 (n->gl32-object 273))
 
 (define (get-n o)
   (cdr (assoc 'n o)))
@@ -283,6 +284,15 @@
 (check-true (f8==? (gl32-f8 _85 _f8-X+1) _f8-X2+X))
 (check-true (f8==? (gl32-f8 _85 _f8-X2+X) _f8-X2+X+1))
 (check-true (f8==? (gl32-f8 _85 _f8-X2+X+1) _f8-X+1))
+
+(check-true (f8==? (gl32-f8 _273 _f8-0) _f8-0))
+(check-true (f8==? (gl32-f8 _273 _f8-1) _f8-1))
+(check-true (f8==? (gl32-f8 _273 _f8-X2) _f8-X2))
+(check-true (f8==? (gl32-f8 _273 _f8-X2+1) _f8-X2+1))
+(check-true (f8==? (gl32-f8 _273 _f8-X) _f8-X))
+(check-true (f8==? (gl32-f8 _273 _f8-X+1) _f8-X+1))
+(check-true (f8==? (gl32-f8 _273 _f8-X2+X) _f8-X2+X))
+(check-true (f8==? (gl32-f8 _273 _f8-X2+X+1) _f8-X2+X+1))
 
 ;PSL(2,7)
 
@@ -668,4 +678,4 @@
         (displayln (metapost-dot n))
         (displayln "endfig;")))
 
-(for-each display-metapost-gl32-figure gl32-integers)
+;(for-each display-metapost-gl32-figure gl32-integers)
