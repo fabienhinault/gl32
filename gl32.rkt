@@ -199,11 +199,12 @@
 
 ;vector of f8 objects by powers
 ;                         X^0   X^1   X^2    X^3     X^4      X^5        X^6
-(define f8-powers (vector _f8-1 _f8-X _f8-X2 _f8-X+1 _f8-X2+X _f8-X2+X+1 _f8-X2+1))
-(define (get-f8-power k)
+(define f8-by-powers (vector _f8-1 _f8-X _f8-X2 _f8-X+1 _f8-X2+X _f8-X2+X+1 _f8-X2+1))
+(define (get-f8-by-power k)
   (if (equal? k ∞)
       _f8-0
-      (vector-ref f8-powers k)))
+      (vector-ref f8-by-powers k)))
+
 (define f8-decomposition
   (list (cons _f8-0 (list _f8-0))
         (cons _f8-1 (list _f8-1))
@@ -222,7 +223,7 @@
 (vector-set! f8-vectors 0 _f8-0)
 (for-each
  (λ (_) (vector-set! f8-vectors (_ 'vector-n) _))
- (vector->list f8-powers))
+ (vector->list f8-by-powers))
 (check-true (f8==? (vector-ref f8-vectors 6) _f8-X2+X))
 
 (define (vector3+ . vector3s)
@@ -240,7 +241,7 @@
 (check-true (f8==? (f8+ _f8-X2+X+1 _f8-X2+1) _f8-X))
 
 (define (_f8*powers power1 power2)
-  (vector-ref f8-powers (+ power1 power2)))
+  (vector-ref f8-by-powers (+ power1 power2)))
 
 (define (f8* _1 _2)
   (if (or (f8==? _1 _f8-0) (f8==? _2 _f8-0))
@@ -261,6 +262,22 @@
 (check-true (f8==? (f8* _f8-X _f8-1) _f8-X))
 (check-true (f8==? (f8* _f8-1 _f8-X2) _f8-X2))
 (check-true (f8==? (f8* _f8-X2+X+1 _f8-X2+1) _f8-X2+X))
+
+
+(define f8-powers-3d-array
+        (array #[#[#[∞ 2] #[1 4]] #[#[0 6] #[3 5]]]))
+
+(define f8-3d-array
+        (array-map get-f8-by-power f8-powers-3d-array))
+
+(check-equal? (array-ref f8-3d-array #(0 0 0)) _f8-0)
+(check-equal? (array-ref f8-3d-array #(1 0 0)) _f8-1)
+(check-equal? (array-ref f8-3d-array #(0 1 0)) _f8-X)
+(check-equal? (array-ref f8-3d-array #(0 0 1)) _f8-X2)
+(check-equal? (array-ref f8-3d-array #(1 1 0)) _f8-X+1)
+(check-equal? (array-ref f8-3d-array #(1 0 1)) _f8-X2+1)
+(check-equal? (array-ref f8-3d-array #(0 1 1)) _f8-X2+X)
+(check-equal? (array-ref f8-3d-array #(1 1 1)) _f8-X2+X+1)
 
 (define (gl32-f8 ogl32 of8)
   (vector-ref
@@ -294,11 +311,19 @@
 (check-true (f8==? (gl32-f8 _273 _f8-X2+X) _f8-X2+X))
 (check-true (f8==? (gl32-f8 _273 _f8-X2+X+1) _f8-X2+X+1))
 
+(define (T-1 ogl32)
+  (λ (f7bar-nb)
+    (array-ref f8-powers-3d-array
+               (matrix->vector (gl32-matrix* (get-matrix ogl32)
+                                             (vector->matrix
+                                              3 1 ((get-f8-by-power f7bar-nb) 'vector)))))))
+
 ;PSL(2,7)
 
 ;m2z7
 ;(define m2z7 (map n->psl27-object (range 0 (expt 7 (* 2 2)))))
 (define r7 (range 7))
+(define r7bar (append r7 (list inf)))
 (define m2z7 (map (λ (_)(list->matrix 2 2 _))
                   (cartesian-product r7 r7 r7 r7)))
 (define psl27-matrices (filter
@@ -328,7 +353,9 @@
 (define (/7bar k l)
   (*7bar k (inv7bar l)))
 
-(define (sf2 psl27-matrix)
+
+;SLF(7) is the set of special linear fractional transforms on FF_7 = ZZ/7ZZ
+(define (slf7 psl27-matrix)
   (let* ((a (matrix-ref psl27-matrix 0 0))
          (b (matrix-ref psl27-matrix 0 1))
          (c (matrix-ref psl27-matrix 1 0))
@@ -336,22 +363,23 @@
     (λ (k)
       (if (equal? k ∞)
           (if (equal? c 0) ∞ (/7bar a c))
-          (/7bar (+7bar (*7bar a k) b) (+7bar (*7bar c k) d))))))
+          (/7bar (+7bar (*7bar a k) b)
+                 (+7bar (*7bar c k) d))))))
 
-(define sf2-3663 (sf2 _3663))
-(check-equal? (sf2-3663 0) 2) ; 6/3 = -1*5 = -5 = 2
-(check-equal? (sf2-3663 1) 1) ; (3 + 6)/(6 + 3) = 1
-(check-equal? (sf2-3663 2) 5) ; (2*3 + 6)/(2*6 + 3) = -2/1 = 5
-(check-equal? (sf2-3663 3) ∞) ; (3*3 + 6)/(3*6 + 3) = 1/0 = ∞
-(check-equal? (sf2-3663 4) 3) ; (4*3 + 6)/(4*6 + 3) = -3/-1 = 3
-(check-equal? (sf2-3663 5) 0) ; (5*3 + 6)/(5*6 + 3) = (15 - 1)/(-5 + 3) = 0
-(check-equal? (sf2-3663 6) 6) ; (6*3 + 6)/(6*6 + 3) = (-3 - 1)/(1 + 3) = -1 = 6
-(check-equal? (sf2-3663 ∞) 4) ; 3/6 = -3 = 4
+(define slf7-3663 (slf7 _3663))
+(check-equal? (slf7-3663 0) 2) ; 6/3 = -1*5 = -5 = 2
+(check-equal? (slf7-3663 1) 1) ; (3 + 6)/(6 + 3) = 1
+(check-equal? (slf7-3663 2) 5) ; (2*3 + 6)/(2*6 + 3) = -2/1 = 5
+(check-equal? (slf7-3663 3) ∞) ; (3*3 + 6)/(3*6 + 3) = 1/0 = ∞
+(check-equal? (slf7-3663 4) 3) ; (4*3 + 6)/(4*6 + 3) = -3/-1 = 3
+(check-equal? (slf7-3663 5) 0) ; (5*3 + 6)/(5*6 + 3) = (1 - 1)/(-5 + 3) = 0
+(check-equal? (slf7-3663 6) 6) ; (6*3 + 6)/(6*6 + 3) = (-3 - 1)/(1 + 3) = -1 = 6
+(check-equal? (slf7-3663 ∞) 4) ; 3/6 = -3 = 4
 
-(define (_sf2->glf8-k sf2)
-  (λ (k) (f8+ (get-f8-power (sf2 k)) (get-f8-power (sf2 ∞)))))
+(define (_slf7->glf8 slf7)
+  (λ (k) (f8+ (get-f8-by-power (slf7 k)) (get-f8-by-power (slf7 ∞)))))
 
-(define _glf8-k-3663 (_sf2->glf8-k sf2-3663))
+(define _glf8-k-3663 (_slf7->glf8 slf7-3663))
 (define (check-f8==? v1 v2)
   (check-true (f8==? v1 v2)))
 (check-f8==? (_glf8-k-3663 0) _f8-X)      ; = X^f(0) + X^f(∞) = X^2 + X^4 = X^2 + X^2 + X = X
@@ -362,6 +390,28 @@
 (check-f8==? (_glf8-k-3663 5) _f8-X2+X+1) ; = X^f(5) + X^f(∞) = 1 + X^4   = 1 + X^2 + X = X^2 + X + 1
 (check-f8==? (_glf8-k-3663 6) _f8-X+1)    ; = X^f(6) + X^f(∞) = X^6 + X^4 = X^2 + 1 + X^2 + X = X + 1
 (check-f8==? (_glf8-k-3663 ∞) _f8-0)      ; = X^f(∞) + X^f(∞) = 0
+
+(define psl27-by-f7bar-images
+  (map
+   (λ (psl27-matrix)
+     (cons (mapo 'power (map (_slf7->glf8 (slf7 psl27-matrix)) r7bar)) psl27-matrix))
+   psl27-matrices))
+
+(define unmatched-gl32
+  (map
+   (λ (ogl32) (map (T-1 ogl32) r7bar))
+   gl32-objects))
+
+(define psl27-by-gl32
+  (map
+   (λ (ogl32)
+     (let1 r7bar-result
+           (map (T-1 ogl32) r7bar)
+           (list r7bar-result
+                 (cdr (assoc r7bar-result psl27-by-f7bar-images))
+                 (cdr (assoc 'matrix ogl32)))))
+   gl32-objects))
+
 
 ;;;;;;;;;;;
 ; powers of a GL32 object
@@ -498,7 +548,7 @@
              (λ (_) (move-left y-invariant-car? _
                               (λ (_) (move-left z-invariant-car? _
                                                  (λ (_) _)))))))
-             
+           
 (define gl32-graph-not-triangles
   (sort (filter-not (λ (_) (equal? 2 (length _))) gl32-graph-cycles)
         (λ (l1 l2) (< (length l1) (length l2)))))
@@ -550,7 +600,8 @@
                      row))
    "</tr>"))
 
-(check-equal? (row->dot-html-string '(0 1 0)) "<tr><td HEIGHT=\"18\" WIDTH=\"18\"></td><td HEIGHT=\"18\" WIDTH=\"18\" BGCOLOR=\"black\"></td><td HEIGHT=\"18\" WIDTH=\"18\"></td></tr>")
+(check-equal? (row->dot-html-string '(0 1 0))
+              "<tr><td HEIGHT=\"18\" WIDTH=\"18\"></td><td HEIGHT=\"18\" WIDTH=\"18\" BGCOLOR=\"black\"></td><td HEIGHT=\"18\" WIDTH=\"18\"></td></tr>")
 
 (define (matrix-list->dot-struct-string matrix-list)
   (string-join (map row->dot-struct-string matrix-list) "|"))
