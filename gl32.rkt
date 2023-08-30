@@ -95,6 +95,12 @@
 (define (n->gl32-object n)
   (list (cons 'n n) (cons 'matrix (get-gl32-matrix n))))
 
+(define (gl32-object n)
+  (let* ((mat (get-gl32-matrix n))
+         (al (list (cons 'n n) 
+                   (cons 'matrix mat))))
+        (λ (arg) (cdr (assoc arg al)))))
+
 (define gl32-identity (n->gl32-object 273))
 
 (define _84 (n->gl32-object 84))
@@ -146,9 +152,15 @@
 (define gl32-integers (map (λ (_) (cdr (assoc 'n _))) gl32-objects))
 
 ;F8
+(define (eval-polynomial coeffs x)
+  (foldl (lambda (coeff acc) (+ coeff (* x acc))) 0 coeffs))
+
 ;f8-vector->n is actually P(2) for polynomial P, but not modulo 2
+;(define (f8-vector->n v)
+;  (+ (vector-ref v 0) (* 2 (vector-ref v 1)) (* 4 (vector-ref v 2))))
 (define (f8-vector->n v)
-  (+ (vector-ref v 0) (* 2 (vector-ref v 1)) (* 4 (vector-ref v 2))))
+   (eval-polynomial (vector->list v) 2))
+
 (check-equal? (f8-vector->n #[0 0 0]) 0)
 (check-equal? (f8-vector->n #[1 0 0]) 1)
 (check-equal? (f8-vector->n #[0 1 0]) 2)
