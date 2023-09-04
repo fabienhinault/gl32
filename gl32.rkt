@@ -17,6 +17,9 @@
 (define (mapo symbol l)
   (map (λ (_) (_ symbol)) l))
 
+(define (filtero predicate-symbol l)
+  (filter (λ (_) ((_ predicate-symbol))) l))
+
 (define (mod2 n)
   (modulo n 2))
 
@@ -98,12 +101,25 @@
 (define (gl32-object n)
   (let* ((mat (get-gl32-matrix n))
          (al (list (cons 'n n) 
-                   (cons 'matrix mat))))
-        (λ (arg) (cdr (assoc arg al)))))
+                   (cons 'matrix mat)
+                   (cons 'equal? (λ (other) (equal? (other 'n) n)))
+                   (cons 'identity? (λ () (equal? n 273)))
+                   (cons '* (λ (other) (gl32-object (gl32-matrix->n (matrix* mat (other 'matrix))))))
+                   (cons 'gl32? (λ () (odd? (matrix-determinant mat))))
+                   ))
+         (this (λ (symbol) (cdr (assoc symbol al)))))
+    this))
 
 (define gl32-identity (n->gl32-object 273))
+(define _gl32-identity (gl32-object 273))
+(check-true ((_gl32-identity 'identity?)))
+(check-true ((((_gl32-identity '*) _gl32-identity) 'identity?)))
 
 (define _84 (n->gl32-object 84))
+(define __84 (gl32-object 84))
+(check-false ((__84 'identity?)))
+(check-true ((((_gl32-identity '*) __84) 'equal?) __84))
+(check-true ((((__84 '*) _gl32-identity) 'equal?) __84))
 (define _85 (n->gl32-object 85))
 (define _86 (n->gl32-object 86))
 (define _98 (n->gl32-object 98))
@@ -118,12 +134,15 @@
 
 ; M_3(ZZ_2) the set of all square matrices of dimension 3 in ZZ_2
 (define m3z2 (map n->gl32-object (range 0 512)))
+(define _m3z2 (map gl32-object (range 0 512)))
 (define m3z2-vector (apply vector m3z2))
 ;list of GL32 objects
 (define gl32-objects (filter (λ (_) (odd? (matrix-determinant (cdr (assoc 'matrix _))))) m3z2))
+(define _gl32-objects (filtero 'gl32? _m3z2))
 (define gl32-vector (vector-map (λ (_) (if (odd? (matrix-determinant (cdr (assoc 'matrix _)))) _ 0)) m3z2-vector))
 
 (check-equal? (length gl32-objects) 168)
+(check-equal? (length _gl32-objects) 168)
 
 (define (matrix->gl32 m)
   (let1 mm2 (matrix-map mod2 m) 
@@ -149,18 +168,13 @@
 (check-true (gl32-symetrical? (n->gl32-object 85)))
 (check-false (gl32-symetrical? _86))
 
-(define gl32-integers (map (λ (_) (cdr (assoc 'n _))) gl32-objects))
+(define gl32-integers (mapo 'n _gl32-objects))
+(check-equal? (length gl32-integers) 168)
 
 ;F8
-(define (eval-polynomial coeffs x)
-  (foldl (lambda (coeff acc) (+ coeff (* x acc))) 0 coeffs))
-
 ;f8-vector->n is actually P(2) for polynomial P, but not modulo 2
-;(define (f8-vector->n v)
-;  (+ (vector-ref v 0) (* 2 (vector-ref v 1)) (* 4 (vector-ref v 2))))
 (define (f8-vector->n v)
-   (eval-polynomial (vector->list v) 2))
-
+  (+ (vector-ref v 0) (* 2 (vector-ref v 1)) (* 4 (vector-ref v 2))))
 (check-equal? (f8-vector->n #[0 0 0]) 0)
 (check-equal? (f8-vector->n #[1 0 0]) 1)
 (check-equal? (f8-vector->n #[0 1 0]) 2)
@@ -314,15 +328,6 @@
 (check-true (f8==? (gl32-f8 _85 _f8-X2+X) _f8-X2+X+1))
 (check-true (f8==? (gl32-f8 _85 _f8-X2+X+1) _f8-X+1))
 
-(check-true (f8==? (gl32-f8 _273 _f8-0) _f8-0))
-(check-true (f8==? (gl32-f8 _273 _f8-1) _f8-1))
-(check-true (f8==? (gl32-f8 _273 _f8-X2) _f8-X2))
-(check-true (f8==? (gl32-f8 _273 _f8-X2+1) _f8-X2+1))
-(check-true (f8==? (gl32-f8 _273 _f8-X) _f8-X))
-(check-true (f8==? (gl32-f8 _273 _f8-X+1) _f8-X+1))
-(check-true (f8==? (gl32-f8 _273 _f8-X2+X) _f8-X2+X))
-(check-true (f8==? (gl32-f8 _273 _f8-X2+X+1) _f8-X2+X+1))
-
 (define (T-1 ogl32)
   (λ (f7bar-nb)
     (array-ref f8-powers-3d-array
@@ -335,7 +340,6 @@
 ;m2z7
 ;(define m2z7 (map n->psl27-object (range 0 (expt 7 (* 2 2)))))
 (define r7 (range 7))
-(define r7bar (append r7 (list inf)))
 (define m2z7 (map (λ (_)(list->matrix 2 2 _))
                   (cartesian-product r7 r7 r7 r7)))
 (define psl27-matrices (filter
@@ -365,9 +369,7 @@
 (define (/7bar k l)
   (*7bar k (inv7bar l)))
 
-
-;SLF(7) is the set of special linear fractional transforms on FF_7 = ZZ/7ZZ
-(define (slf7 psl27-matrix)
+(define (sf2 psl27-matrix)
   (let* ((a (matrix-ref psl27-matrix 0 0))
          (b (matrix-ref psl27-matrix 0 1))
          (c (matrix-ref psl27-matrix 1 0))
@@ -375,23 +377,22 @@
     (λ (k)
       (if (equal? k ∞)
           (if (equal? c 0) ∞ (/7bar a c))
-          (/7bar (+7bar (*7bar a k) b)
-                 (+7bar (*7bar c k) d))))))
+          (/7bar (+7bar (*7bar a k) b) (+7bar (*7bar c k) d))))))
 
-(define slf7-3663 (slf7 _3663))
-(check-equal? (slf7-3663 0) 2) ; 6/3 = -1*5 = -5 = 2
-(check-equal? (slf7-3663 1) 1) ; (3 + 6)/(6 + 3) = 1
-(check-equal? (slf7-3663 2) 5) ; (2*3 + 6)/(2*6 + 3) = -2/1 = 5
-(check-equal? (slf7-3663 3) ∞) ; (3*3 + 6)/(3*6 + 3) = 1/0 = ∞
-(check-equal? (slf7-3663 4) 3) ; (4*3 + 6)/(4*6 + 3) = -3/-1 = 3
-(check-equal? (slf7-3663 5) 0) ; (5*3 + 6)/(5*6 + 3) = (1 - 1)/(-5 + 3) = 0
-(check-equal? (slf7-3663 6) 6) ; (6*3 + 6)/(6*6 + 3) = (-3 - 1)/(1 + 3) = -1 = 6
-(check-equal? (slf7-3663 ∞) 4) ; 3/6 = -3 = 4
+(define sf2-3663 (sf2 _3663))
+(check-equal? (sf2-3663 0) 2) ; 6/3 = -1*5 = -5 = 2
+(check-equal? (sf2-3663 1) 1) ; (3 + 6)/(6 + 3) = 1
+(check-equal? (sf2-3663 2) 5) ; (2*3 + 6)/(2*6 + 3) = -2/1 = 5
+(check-equal? (sf2-3663 3) ∞) ; (3*3 + 6)/(3*6 + 3) = 1/0 = ∞
+(check-equal? (sf2-3663 4) 3) ; (4*3 + 6)/(4*6 + 3) = -3/-1 = 3
+(check-equal? (sf2-3663 5) 0) ; (5*3 + 6)/(5*6 + 3) = (15 - 1)/(-5 + 3) = 0
+(check-equal? (sf2-3663 6) 6) ; (6*3 + 6)/(6*6 + 3) = (-3 - 1)/(1 + 3) = -1 = 6
+(check-equal? (sf2-3663 ∞) 4) ; 3/6 = -3 = 4
 
-(define (_slf7->glf8 slf7)
-  (λ (k) (f8+ (get-f8-by-power (slf7 k)) (get-f8-by-power (slf7 ∞)))))
+(define (_sf2->glf8-k sf2)
+  (λ (k) (f8+ (get-f8-by-power (sf2 k)) (get-f8-by-power (sf2 ∞)))))
 
-(define _glf8-k-3663 (_slf7->glf8 slf7-3663))
+(define _glf8-k-3663 (_sf2->glf8-k sf2-3663))
 (define (check-f8==? v1 v2)
   (check-true (f8==? v1 v2)))
 (check-f8==? (_glf8-k-3663 0) _f8-X)      ; = X^f(0) + X^f(∞) = X^2 + X^4 = X^2 + X^2 + X = X
@@ -402,28 +403,6 @@
 (check-f8==? (_glf8-k-3663 5) _f8-X2+X+1) ; = X^f(5) + X^f(∞) = 1 + X^4   = 1 + X^2 + X = X^2 + X + 1
 (check-f8==? (_glf8-k-3663 6) _f8-X+1)    ; = X^f(6) + X^f(∞) = X^6 + X^4 = X^2 + 1 + X^2 + X = X + 1
 (check-f8==? (_glf8-k-3663 ∞) _f8-0)      ; = X^f(∞) + X^f(∞) = 0
-
-(define psl27-by-f7bar-images
-  (map
-   (λ (psl27-matrix)
-     (cons (mapo 'power (map (_slf7->glf8 (slf7 psl27-matrix)) r7bar)) psl27-matrix))
-   psl27-matrices))
-
-(define unmatched-gl32
-  (map
-   (λ (ogl32) (map (T-1 ogl32) r7bar))
-   gl32-objects))
-
-(define psl27-by-gl32
-  (map
-   (λ (ogl32)
-     (let1 r7bar-result
-           (map (T-1 ogl32) r7bar)
-           (list r7bar-result
-                 (cdr (assoc r7bar-result psl27-by-f7bar-images))
-                 (cdr (assoc 'matrix ogl32)))))
-   gl32-objects))
-
 
 ;;;;;;;;;;;
 ; powers of a GL32 object
@@ -450,6 +429,14 @@
 ;  (500 6 (500 335 229 187 426 94))
 ;  (501 3 (501 266 494)))
 (define powers
+  (map (λ (_)
+         (let* ((m (cdr(assoc 'matrix _)))
+                (ps (get-gl32-matrix-powers m (list m)))
+                (ns (map gl32-matrix->n ps)))
+           (list (cdr(assoc 'n _)) (length ns) ns )))
+       gl32-objects))
+
+(define _powers
   (map (λ (_)
          (let* ((m (cdr(assoc 'matrix _)))
                 (ps (get-gl32-matrix-powers m (list m)))
@@ -560,7 +547,7 @@
              (λ (_) (move-left y-invariant-car? _
                               (λ (_) (move-left z-invariant-car? _
                                                  (λ (_) _)))))))
-           
+             
 (define gl32-graph-not-triangles
   (sort (filter-not (λ (_) (equal? 2 (length _))) gl32-graph-cycles)
         (λ (l1 l2) (< (length l1) (length l2)))))
