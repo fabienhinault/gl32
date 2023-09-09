@@ -98,16 +98,33 @@
 (define (n->gl32-object n)
   (list (cons 'n n) (cons 'matrix (get-gl32-matrix n))))
 
+(define (mlist mpair . elements)
+  (if (null? (cdr elements))
+      (cons (car elements) mpair)
+      (cons (car elements) (apply mlist (cons mpair (cdr elements))))))
+
+; powers of a GL32 object
+(define (__get-gl32-powers gl32-object result)
+  (let1 next (((car result) '*) gl32-object)
+        (if ((next 'identity?))
+            (reverse result)
+            (__get-gl32-powers gl32-object (cons next result)))))
+
 (define (gl32-object n)
   (let* ((mat (get-gl32-matrix n))
-         (al (list (cons 'n n) 
-                   (cons 'matrix mat)
-                   (cons 'equal? (λ (other) (equal? (other 'n) n)))
-                   (cons 'identity? (λ () (equal? n 273)))
-                   (cons '* (λ (other) (gl32-object (gl32-matrix->n (matrix* mat (other 'matrix))))))
-                   (cons 'gl32? (λ () (odd? (matrix-determinant mat))))
-                   ))
+         (mal (mcons (cons 'gl32? (λ () (odd? (matrix-determinant mat)))) '()))
+         (al (mlist
+              mal
+              (cons 'n n) 
+              (cons 'matrix mat)
+              (cons 'equal? (λ (other) (equal? (other 'n) n)))
+              (cons 'identity? (λ () (equal? n 273)))
+              (cons '* (λ (other) (gl32-object (gl32-matrix->n (matrix* mat (other 'matrix))))))
+              (cons 'gl32? (λ () (odd? (matrix-determinant mat))))
+              ))
          (this (λ (symbol) (cdr (assoc symbol al)))))
+    ; !! assoc: not a proper list
+    ;(set-mcdr! mal (list (cons 'powers (λ () (__get-gl32-powers gl32-object (list this))))))
     this))
 
 (define gl32-identity (n->gl32-object 273))
@@ -433,16 +450,14 @@
          (let* ((m (cdr(assoc 'matrix _)))
                 (ps (get-gl32-matrix-powers m (list m)))
                 (ns (map gl32-matrix->n ps)))
-           (list (cdr(assoc 'n _)) (length ns) ns )))
+           (list (cdr (assoc 'n _)) (length ns) ns )))
        gl32-objects))
 
-(define _powers
-  (map (λ (_)
-         (let* ((m (cdr(assoc 'matrix _)))
-                (ps (get-gl32-matrix-powers m (list m)))
-                (ns (map gl32-matrix->n ps)))
-           (list (cdr(assoc 'n _)) (length ns) ns )))
-       gl32-objects))
+;(define _powers
+;  (map (λ (_)
+;         (let1 ns (mapo 'n ((_ 'powers)))
+;               (list (cdr ((_ 'n)) (length ns) ns ))))
+;       _gl32-objects))
 
 
 ; vector of cycles as lists of integers
