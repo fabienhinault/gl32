@@ -64,78 +64,13 @@
 
 (define (n->matrix-list n)
   (group-by-n (n->bit-list n 9 '()) 3 '()))
-
-(define (get-gl32-matrix n)
-  (list->matrix 3 3 (n->bit-list n 9 '())))
-
-(check-equal? (get-gl32-matrix 0)   (matrix [[0 0 0] [0 0 0] [0 0 0]]))
-(check-equal? (get-gl32-matrix 1)   (matrix ((0 0 0) (0 0 0) (0 0 1))))
-;84 = 64 + 16 + 4 = 2**6 + 2**4 + 2**2
-(check-equal? (get-gl32-matrix 84)  (matrix ((0 0 1) (0 1 0) (1 0 0))))
-
-(define (gl32-matrix->n m)
-  (let1 l (matrix->list m)
-        (bit-list->n l 9 0)))
-
-(check-equal? (gl32-matrix->n (matrix [[0 0 0] [0 0 0] [0 0 0]])) 0)
-(check-equal? (gl32-matrix->n (matrix [[0 0 0] [0 0 0] [0 0 1]])) 1)
-(check-equal? (gl32-matrix->n (matrix [[0 0 1] [0 1 0] [1 0 0]])) 84)
-
-(define (gl32-matrix* m1 m2)
-  (matrix-map mod2 (matrix* m1 m2)))
-
-;;;;;;;
-; gl32 objects
-
-; powers of a GL32 object
-(define (__get-gl32-powers o result)
-  (let1 next ((car result) '* o)
-        (if (next 'identity?)
-            (reverse result)
-            (__get-gl32-powers o (cons next result)))))
-
-(define (gl32-object n)
-  (let* ((mat (get-gl32-matrix n))
-         (al (list
-              (cons 'n (λ (this) n))
-              (cons 'matrix (λ (this) mat))
-              (cons 'equal? (λ (this other) (equal? (other 'n) n)))
-              (cons 'identity? (λ (this) (equal? n 273)))
-              (cons '* (λ (this other) (gl32-object (gl32-matrix->n (gl32-matrix* mat (other 'matrix))))))
-              (cons 'gl32? (λ (this) (odd? (matrix-determinant mat))))
-              (cons 'powers (λ (this) (__get-gl32-powers this (list this))))
-              (cons 'image (λ (this vector3) (matrix->vector (gl32-matrix* mat (vector->matrix 3 1 vector3)))))
-              (cons '*vector3 (λ (this vector3) (matrix->vector (gl32-matrix* mat (vector->matrix 3 1 vector3)))))
-              ))
-         (this '())
-         (that (λ (symbol . args) (apply (cdr (assoc symbol al)) (cons this args)))))
-    (set! this that)
-    this))
-
-(define _gl32-identity (gl32-object 273))
-(check-true (_gl32-identity 'identity?))
-(check-true ((_gl32-identity '* _gl32-identity) 'identity?))
-
-(define _84 (gl32-object 84))
-(check-false (_84 'identity?))
-(check-true ((_gl32-identity '* _84) 'equal? _84))
-(check-true ((_84 '* _gl32-identity) 'equal? _84))
-(check-equal? (mapo 'n (_84 'powers)) '(84))
-(check-equal? (_84 'image #[1 0 0]) #[0 0 1])
-(define _85 (gl32-object 85))
-(define _86 (gl32-object 86))
-(define _98 (gl32-object 98))
-(define _140 (gl32-object 140))
-
-; M_3(ZZ_2) the set of all square matrices of dimension 3 in ZZ_2
-(define _m3z2 (map gl32-object (range 0 512)))
-;list of GL32 objects
-(define _gl32-objects (filtero 'gl32? _m3z2))
-
-(check-equal? (length _gl32-objects) 168)
-
-(define gl32-integers (mapo 'n _gl32-objects))
-(check-equal? (length gl32-integers) 168)
+;#######  #####
+;#       #     #
+;#       #     #
+;#####    #####
+;#       #     #
+;#       #     #
+;#        #####
 
 ;F8
 (define (vector3+ . vector3s)
@@ -166,51 +101,44 @@
 (check-equal? #[1 1 1] (n->f8-vector 7))
 
 (define f8-vectors (make-vector 8))
+(define f8s '())
 
-;(define (f8-object vector symbol power)
-;  (let1 alist (list (cons 'vector (λ () vector))
-;                    (cons 'vector-n (λ () (f8-vector->n vector)))
-;                    (cons 'symbol (λ () symbol))
-;                    (cons 'power (λ () power))
-;                    (cons 'coord==0? (λ (i) (equal? 0 (vector-ref vector i))))
-;                    (cons 'in-vector (λ () (vector-ref f8-vectors (f8-vector->n vector))))
-;                    (cons '==? (λ (other) (equal? vector (other 'vector))))
-;                    (cons '+ (λ others
-;                               (vector-ref f8-vectors
-;                                           (f8-vector->n
-;                                            (vector-map mod2
-;                                                        (apply vector3+ (cons vector (mapo 'vector others))))))))
-;                    )
-;        (λ (symbol . args) (apply (cdr (assoc symbol alist)) args))))
 (define (f8-object vector symbol power)
   (let1 alist (list (cons 'vector vector)
                     (cons 'vector-n (f8-vector->n vector))
                     (cons 'symbol symbol)
                     (cons 'power power)
-                    (cons 'ref0? (λ (i) (equal? 0 (vector-ref vector i)))))
+                    (cons 'coeff (λ (i-coeff) (vector-ref vector i-coeff)))
+                    (cons 'coeff==0? (λ (i-coeff) (equal? 0 (vector-ref vector i-coeff))))
+                    (cons '==? (λ (other) (equal? vector (other 'vector))))
+                    (cons 'in-array (λ () (array-ref f8s vector)))
+                    ;(cons '*scalar (λ (scalar) (if (equal? 0 scalar) _f8-0 this)))
+                    )
         (λ (arg) (cdr (assoc arg alist)))))
-
-
 (define (f8==? _1 _2)
   (equal? (_1 'vector) (_2 'vector)))
 
 (define ∞ +inf.0)
 (define inf +inf.0)
+(set! f8s (array #[#[#[(f8-object #[0 0 0] '0 ∞) (f8-object #[0 0 1] 'X2 2)]
+                     #[(f8-object #[0 1 0] 'X 1) (f8-object #[0 1 1] 'X2+X 4)]]
+                   #[#[(f8-object #[1 0 0] '1 0) (f8-object #[1 0 1] 'X2+1 6)]
+                     #[(f8-object #[1 1 0] 'X+1 3) (f8-object #[1 1 1] 'X2+X+1 5)]]]))
 
-(define _f8-0 (f8-object #[0 0 0] '0 ∞))
-(define _f8-1 (f8-object #[1 0 0] '1 0))
-(define _f8-X (f8-object #[0 1 0] 'X 1))
-(define _f8-X2 (f8-object #[0 0 1] 'X2 2))
-(define _f8-X+1 (f8-object #[1 1 0] 'X+1 3))
-(define _f8-X2+X (f8-object #[0 1 1] 'X2+X 4))
-(define _f8-X2+X+1 (f8-object #[1 1 1] 'X2+X+1 5))
-(define _f8-X2+1 (f8-object #[1 0 1] 'X2+1 6))
+(define _f8-0 (array-ref f8s #(0 0 0)))
+(define _f8-1 (array-ref f8s #(1 0 0)))
+(define _f8-X (array-ref f8s #(0 1 0)))
+(define _f8-X2 (array-ref f8s #(0 0 1)))
+(define _f8-X+1 (array-ref f8s #(1 1 0)))
+(define _f8-X2+X (array-ref f8s #(0 1 1)))
+(define _f8-X2+X+1 (array-ref f8s #(1 1 1)))
+(define _f8-X2+1 (array-ref f8s #(1 0 1)))
 
 (check-equal? (_f8-X2+1 'vector) #[1 0 1])
-(check-true (f8==? _f8-0 (f8-object #[0 0 0] 0 ∞)))
-(check-true ((_f8-X2+1 'ref0?) 1))
-(check-false ((_f8-X2+1 'ref0?) 0))
-(check-false ((_f8-X2+1 'ref0?) 2))
+(check-true (( _f8-0 '==?) (f8-object #[0 0 0] 0 ∞)))
+(check-true ((_f8-X2+1 'coeff==0?) 1))
+(check-false ((_f8-X2+1 'coeff==0?) 0))
+(check-false ((_f8-X2+1 'coeff==0?) 2))
 
 ;vector of f8 objects by powers
 ;                             X^0   X^1   X^2    X^3     X^4      X^5        X^6
@@ -251,7 +179,15 @@
 
 ;X^(power1 + power2)
 (define (_f8*powers power1 power2)
-  (vector-ref f8-by-powers (+ power1 power2)))
+  (get-f8-by-power (+ power1 power2)))
+;scalar = 0 or 1
+(define (f8*scalar f8o scalar)
+  (if (equal? scalar 0) _f8-0 f8o))
+
+(define (f8-monomial* coeff1 power1 coeff2 power2)
+  (if (or (equal? coeff1 0) (equal? coeff2 0))
+      _f8-0
+      (get-f8-by-power (+ power1 power2))))
 
 ;(a0 + a1X + a2X²)(b0 + b1X + b2X²)
 (define (f8* _1 _2)
@@ -260,9 +196,7 @@
       (apply f8+
              (flatten
               (map (λ (i1) (map (λ (i2)
-                                  (if (or ((_1 'ref0?) i1) ((_2 'ref0?) i2))
-                                      _f8-0
-                                      (_f8*powers i1 i2)))
+                                  (f8-monomial* ((_1 'coeff) i1) i1 ((_2 'coeff) i2) i2))
                                 (range 3)))
                    (range 3))))))
 (check-true (f8==? (f8* _f8-0 _f8-0) _f8-0))
@@ -271,66 +205,138 @@
 (check-true (f8==? (f8* _f8-1 _f8-1) _f8-1))
 (check-true (f8==? (f8* _f8-X _f8-1) _f8-X))
 (check-true (f8==? (f8* _f8-1 _f8-X2) _f8-X2))
-(check-true (f8==? (f8* _f8-X2+X+1 _f8-X2+1) _f8-X2+X))
+; (X2+X+1)(X2+1) = X4+X2+X3+X+X2+1
+;                = X2+X+X2+X+1+X+X2+1
+;                = X2+X
+(check-true (f8==? (f8* _f8-X2+X+1 _f8-X2+1) _f8-X2+X)) 
 
 
 (define f8-powers-3d-array
-        (array #[#[#[∞ 2] #[1 4]] #[#[0 6] #[3 5]]]))
+        (array-map (λ (_) (_ 'power)) f8s))
 
-(define f8-3d-array
-        (array-map get-f8-by-power f8-powers-3d-array))
+(check-equal? f8-powers-3d-array (array #[#[#[∞ 2] #[1 4]] #[#[0 6] #[3 5]]]))
 
-(check-equal? (array-ref f8-3d-array #(0 0 0)) _f8-0)
-(check-equal? (array-ref f8-3d-array #(1 0 0)) _f8-1)
-(check-equal? (array-ref f8-3d-array #(0 1 0)) _f8-X)
-(check-equal? (array-ref f8-3d-array #(0 0 1)) _f8-X2)
-(check-equal? (array-ref f8-3d-array #(1 1 0)) _f8-X+1)
-(check-equal? (array-ref f8-3d-array #(1 0 1)) _f8-X2+1)
-(check-equal? (array-ref f8-3d-array #(0 1 1)) _f8-X2+X)
-(check-equal? (array-ref f8-3d-array #(1 1 1)) _f8-X2+X+1)
+
+; #####  #        #####   #####
+;#     # #       #     # #     #
+;#       #             #       #
+;#  #### #        #####   #####
+;#     # #             # #
+;#     # #       #     # #
+; #####  #######  #####  #######
+  
+;GL32 matrices
+(define (get-gl32-matrix n)
+  (list->matrix 3 3 (n->bit-list n 9 '())))
+
+(check-equal? (get-gl32-matrix 0)   (matrix [[0 0 0] [0 0 0] [0 0 0]]))
+(check-equal? (get-gl32-matrix 1)   (matrix ((0 0 0) (0 0 0) (0 0 1))))
+;84 = 64 + 16 + 4 = 2**6 + 2**4 + 2**2
+(check-equal? (get-gl32-matrix 84)  (matrix ((0 0 1) (0 1 0) (1 0 0))))
+
+(define (gl32-matrix->n m)
+  (let1 l (matrix->list m)
+        (bit-list->n l 9 0)))
+
+(check-equal? (gl32-matrix->n (matrix [[0 0 0] [0 0 0] [0 0 0]])) 0)
+(check-equal? (gl32-matrix->n (matrix [[0 0 0] [0 0 0] [0 0 1]])) 1)
+(check-equal? (gl32-matrix->n (matrix [[0 0 1] [0 1 0] [1 0 0]])) 84)
+
+(define (gl32-matrix* m1 m2)
+  (matrix-map mod2 (matrix* m1 m2)))
+
+;;;;;;;
+; gl32 objects
+
+; powers of a GL32 object
+(define (__get-gl32-powers o result)
+  (let1 next ((car result) '* o)
+        (if (next 'identity?)
+            (reverse result)
+            (__get-gl32-powers o (cons next result)))))
+
+(define (gl32-object n)
+  (let* ((mat (get-gl32-matrix n))
+         (al (list
+              (cons 'n (λ (this) n))
+              (cons 'matrix (λ (this) mat))
+              (cons 'equal? (λ (this other) (equal? (other 'n) n)))
+              (cons 'identity? (λ (this) (equal? n 273)))
+              (cons '* (λ (this other) (gl32-object (gl32-matrix->n (gl32-matrix* mat (other 'matrix))))))
+              (cons 'gl32? (λ (this) (odd? (matrix-determinant mat))))
+              (cons 'powers (λ (this) (__get-gl32-powers this (list this))))
+              (cons 'image (λ (this vector3) (matrix->vector (gl32-matrix* mat (vector->matrix 3 1 vector3)))))
+              (cons '*vector3 (λ (this vector3)
+                                (matrix->vector (gl32-matrix* mat (vector->matrix 3 1 vector3)))))
+              (cons '*f8 (λ (this f8o)
+                           (array-ref f8s (this '*vector3 (f8o 'vector)))))
+              ))
+         (this '())
+         (that (λ (symbol . args) (apply (cdr (assoc symbol al)) (cons this args)))))
+    (set! this that)
+    this))
+
+(define _gl32-identity (gl32-object 273))
+(check-true (_gl32-identity 'identity?))
+(check-true ((_gl32-identity '* _gl32-identity) 'identity?))
+
+(define _84 (gl32-object 84))
+(check-false (_84 'identity?))
+(check-true ((_gl32-identity '* _84) 'equal? _84))
+(check-true ((_84 '* _gl32-identity) 'equal? _84))
+(check-equal? (mapo 'n (_84 'powers)) '(84))
+(check-equal? (_84 '*vector3 #[1 0 0]) #[0 0 1])
+(define _85 (gl32-object 85))
+(define _86 (gl32-object 86))
+(define _98 (gl32-object 98))
+(define _140 (gl32-object 140))
+
+; M_3(ZZ_2) the set of all square matrices of dimension 3 in ZZ_2
+(define _m3z2 (map gl32-object (range 0 512)))
+;list of GL32 objects
+(define _gl32-objects (filtero 'gl32? _m3z2))
+
+(check-equal? (length _gl32-objects) 168)
+
+(define gl32-integers (mapo 'n _gl32-objects))
+(check-equal? (length gl32-integers) 168)
 
 (define (gl32-f8 ogl32 of8)
   (vector-ref
    f8-vectors
-   (f8-vector->n (ogl32 'image (of8 'vector)))))
+   (f8-vector->n (ogl32 '*vector3 (of8 'vector)))))
 
-(check-true (f8==? (gl32-f8 _84 _f8-0) _f8-0))
-(check-true (f8==? (gl32-f8 _84 _f8-1) _f8-X2))
-(check-true (f8==? (gl32-f8 _84 _f8-X2) _f8-1))
-(check-true (f8==? (gl32-f8 _84 _f8-X+1) _f8-X2+X))
-(check-true (f8==? (gl32-f8 _84 _f8-X2+X) _f8-X+1))
-(check-true (f8==? (gl32-f8 _84 _f8-X) _f8-X))
-(check-true (f8==? (gl32-f8 _84 _f8-X2+1) _f8-X2+1))
-(check-true (f8==? (gl32-f8 _84 _f8-X2+X+1) _f8-X2+X+1))
+(check-true (((_84 '*f8 _f8-0) '==?) _f8-0))
+(check-true (((_84 '*f8 _f8-1) '==?) _f8-X2))
+(check-true (((_84 '*f8 _f8-X) '==?) _f8-X))
+(check-true (((_84 '*f8 _f8-X+1) '==?) _f8-X2+X))
+(check-true (((_84 '*f8 _f8-X2) '==?) _f8-1))
+(check-true (((_84 '*f8 _f8-X2+1) '==?) _f8-X2+1))
+(check-true (((_84 '*f8 _f8-X2+X) '==?) _f8-X+1))
+(check-true (((_84 '*f8 _f8-X2+X+1) '==?) _f8-X2+X+1))
 
-(check-true (f8==? (gl32-f8 _85 _f8-0) _f8-0))
-(check-true (f8==? (gl32-f8 _85 _f8-1) _f8-X2))
-(check-true (f8==? (gl32-f8 _85 _f8-X2) _f8-X2+1))
-(check-true (f8==? (gl32-f8 _85 _f8-X2+1) _f8-1))
-(check-true (f8==? (gl32-f8 _85 _f8-X) _f8-X))
-(check-true (f8==? (gl32-f8 _85 _f8-X+1) _f8-X2+X))
-(check-true (f8==? (gl32-f8 _85 _f8-X2+X) _f8-X2+X+1))
-(check-true (f8==? (gl32-f8 _85 _f8-X2+X+1) _f8-X+1))
+(check-true (((_85 '*f8 _f8-0) '==?) _f8-0))
+(check-true (((_85 '*f8 _f8-1) '==?) _f8-X2))
+(check-true (((_85 '*f8 _f8-X) '==?) _f8-X))
+(check-true (((_85 '*f8 _f8-X+1) '==?) _f8-X2+X))
+(check-true (((_85 '*f8 _f8-X2) '==?) _f8-X2+1))
+(check-true (((_85 '*f8 _f8-X2+1) '==?) _f8-1))
+(check-true (((_85 '*f8 _f8-X2+X) '==?) _f8-X2+X+1))
+(check-true (((_85 '*f8 _f8-X2+X+1) '==?) _f8-X+1))
 
 (define (T-1 ogl32)
   (λ (f7bar-nb)
-    (array-ref f8-powers-3d-array (ogl32 'image ((get-f8-by-power f7bar-nb) 'vector)))))
+    (array-ref f8-powers-3d-array (ogl32 '*vector3 ((get-f8-by-power f7bar-nb) 'vector)))))
 
-;PSL(2,7)
-
-;m2z7
-;(define m2z7 (map n->psl27-object (range 0 (expt 7 (* 2 2)))))
-(define r7 (range 7))
-(define m2z7 (map (λ (_)(list->matrix 2 2 _))
-                  (cartesian-product r7 r7 r7 r7)))
-(define psl27-matrices (filter
-                        (λ (_) (and (equal? 1 (mod7 (matrix-determinant _)))
-                                    (or (<= 1 (matrix-ref _ 0 0) 3)
-                                        (and (equal? 0 (matrix-ref _ 0 0))
-                                             (<= 1 (matrix-ref _ 0 1) 3)))))
-                        m2z7))
-(check-equal? (length psl27-matrices) 168)
-(define _3663 (last psl27-matrices))
+;#################
+;
+;######### #######
+;# #       #    #
+;# #           #
+;# #####      #
+;# #         #
+;# #         #
+;###         #
 
 (define (+7bar k l)
   (if (or (equal? k ∞) (equal? l ∞))
@@ -349,6 +355,27 @@
 
 (define (/7bar k l)
   (*7bar k (inv7bar l)))
+
+
+;######   #####  #        #####  #######
+;#     # #     # #       #     # #    #
+;#     # #       #             #     #
+;######   #####  #        #####     #
+;#             # #       #         #
+;#       #     # #       #         #
+;#        #####  ####### #######   #
+
+(define r7 (range 7))
+(define m2z7 (map (λ (_)(list->matrix 2 2 _))
+                  (cartesian-product r7 r7 r7 r7)))
+(define psl27-matrices (filter
+                        (λ (_) (and (equal? 1 (mod7 (matrix-determinant _)))
+                                    (or (<= 1 (matrix-ref _ 0 0) 3)
+                                        (and (equal? 0 (matrix-ref _ 0 0))
+                                             (<= 1 (matrix-ref _ 0 1) 3)))))
+                        m2z7))
+(check-equal? (length psl27-matrices) 168)
+(define _3663 (last psl27-matrices))
 
 (define (sf2 psl27-matrix)
   (let* ((a (matrix-ref psl27-matrix 0 0))
@@ -384,6 +411,7 @@
 (check-f8==? (_glf8-k-3663 5) _f8-X2+X+1) ; = X^f(5) + X^f(∞) = 1 + X^4   = 1 + X^2 + X            = X^2 + X + 1
 (check-f8==? (_glf8-k-3663 6) _f8-X+1)    ; = X^f(6) + X^f(∞) = X^6 + X^4 = X^2 + 1 + X^2 + X      = X + 1
 (check-f8==? (_glf8-k-3663 ∞) _f8-0)      ; = X^f(∞) + X^f(∞)                                      = 0
+
 
 
 ;list of cycles as lists of integers
