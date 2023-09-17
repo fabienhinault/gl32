@@ -64,6 +64,7 @@
 
 (define (n->matrix-list n)
   (group-by-n (n->bit-list n 9 '()) 3 '()))
+
 ;#######  #####
 ;#       #     #
 ;#       #     #
@@ -74,9 +75,12 @@
 
 ;F8
 (define (vector3+ . vector3s)
-  (foldl (λ vs (apply vector-map + vs))
-         #[0 0 0]
-         vector3s))
+  (apply vector-map + vector3s))
+(check-equal? (vector3+ #[1 1 1] #[1 1 0] #[0 1 0]) #[2 3 1])
+
+(define (vector3+%2 . vector3s)
+  (vector-map mod2 (apply vector3+ vector3s)))
+  
 ;f8-vector->n is actually P(2) for polynomial P, but not modulo 2
 (define (f8-vector->n v)
   (+ (vector-ref v 0) (* 2 (vector-ref v 1)) (* 4 (vector-ref v 2))))
@@ -102,6 +106,48 @@
 
 (define f8-vectors (make-vector 8))
 (define f8s '())
+(define f8-objects '())
+(define _f8-by-powers #[])
+(define __f8-0 '())
+
+(define (_f8-object vector symbol power)
+  (let* ((get-f8-by-power (λ (k) (if (equal? k ∞)
+                                     __f8-0
+                                     (vector-ref _f8-by-powers k))))
+         (f8-monomial* (λ (coeff1 power1 coeff2 power2)
+                         (if (or (equal? coeff1 0) (equal? coeff2 0))
+                             __f8-0
+                             (get-f8-by-power (+ power1 power2)))))
+         (alist (list (cons 'vector (λ (this) vector))
+                    (cons 'symbol (λ (this) symbol))
+                    (cons 'power (λ (this) power))
+                    (cons 'coeff (λ (this i-coeff) (vector-ref vector i-coeff)))
+                    (cons 'coeff==0? (λ (this i-coeff) (equal? 0 (vector-ref vector i-coeff))))
+                    (cons '==? (λ (this other) (equal? vector (other 'vector))))
+                    (cons 'in-array (λ (this) (array-ref f8-objects vector)))
+                    (cons '*scalar (λ (this scalar) (if (equal? 0 scalar) __f8-0 this)))
+                    (cons '+_ (λ (this other) (array-ref f8-objects (vector-map mod2 (vector3+ vector (other 'vector))))))
+                    (cons '+ (λ (this . others)
+                               (array-ref f8-objects
+                                          (apply vector3+%2 (cons vector (mapo 'vector others))))))
+                    (cons '*_ (λ (this other)
+                                (if (or (this '==? __f8-0) (other '==? __f8-0))
+                                    __f8-0
+                                    (apply __f8-0
+                                           (cons
+                                            '+
+                                            (flatten
+                                             (map (λ (i1)
+                                                    (map (λ (i2)
+                                                           (f8-monomial* (this 'coeff i1) i1 (other 'coeff i2) i2))
+                                                         (range 3)))
+                                                  (range 3))))))))
+                    ))
+         (this '())
+         (that (λ (symbol . args) (apply (cdr (assoc symbol alist)) (cons this args)))))
+    (set! this that)
+    this))
+
 
 (define (f8-object vector symbol power)
   (let1 alist (list (cons 'vector vector)
@@ -134,11 +180,29 @@
 (define _f8-X2+X+1 (array-ref f8s #(1 1 1)))
 (define _f8-X2+1 (array-ref f8s #(1 0 1)))
 
-(check-equal? (_f8-X2+1 'vector) #[1 0 1])
-(check-true (( _f8-0 '==?) (f8-object #[0 0 0] 0 ∞)))
-(check-true ((_f8-X2+1 'coeff==0?) 1))
-(check-false ((_f8-X2+1 'coeff==0?) 0))
-(check-false ((_f8-X2+1 'coeff==0?) 2))
+
+(set! f8-objects (array #[#[#[(_f8-object #[0 0 0] '0 ∞) (_f8-object #[0 0 1] 'X2 2)]
+                            #[(_f8-object #[0 1 0] 'X 1) (_f8-object #[0 1 1] 'X2+X 4)]]
+                          #[#[(_f8-object #[1 0 0] '1 0) (_f8-object #[1 0 1] 'X2+1 6)]
+                            #[(_f8-object #[1 1 0] 'X+1 3) (_f8-object #[1 1 1] 'X2+X+1 5)]]]))
+
+(set! __f8-0 (array-ref f8-objects #(0 0 0)))
+(define __f8-1 (array-ref f8-objects #(1 0 0)))
+(define __f8-X (array-ref f8-objects #(0 1 0)))
+(define __f8-X2 (array-ref f8-objects #(0 0 1)))
+(define __f8-X+1 (array-ref f8-objects #(1 1 0)))
+(define __f8-X2+X (array-ref f8-objects #(0 1 1)))
+(define __f8-X2+X+1 (array-ref f8-objects #(1 1 1)))
+(define __f8-X2+1 (array-ref f8-objects #(1 0 1)))
+
+
+(check-equal? (__f8-X2+1 'vector) #[1 0 1])
+(define (check==? actual expected)
+  (check-true (actual '==? expected)))
+(check==? __f8-0 (_f8-object #[0 0 0] 0 ∞))
+(check-true (__f8-X2+1 'coeff==0? 1))
+(check-false (__f8-X2+1 'coeff==0? 0))
+(check-false (__f8-X2+1 'coeff==0? 2))
 
 ;vector of f8 objects by powers
 ;                             X^0   X^1   X^2    X^3     X^4      X^5        X^6
@@ -147,6 +211,18 @@
   (if (equal? k ∞)
       _f8-0
       (vector-ref f8-by-powers k)))
+
+;vector of f8 objects by powers
+;                             X^0   X^1   X^2    X^3     X^4              X^5        X^6
+(set! _f8-by-powers (vector __f8-1 __f8-X __f8-X2 __f8-X+1 __f8-X2+X __f8-X2+X+1 __f8-X2+1))
+(define (_get-f8-by-power k)
+  (if (equal? k ∞)
+      __f8-0
+      (vector-ref _f8-by-powers k)))
+
+(check==? __f8-X2+X+1 (_get-f8-by-power 5))
+(check==? __f8-0 (_get-f8-by-power ∞))
+
 
 (define f8-decomposition
   (list (cons _f8-0 (list _f8-0))
@@ -170,19 +246,16 @@
 
 (define (f8+ . f8s)
   (vector-ref f8-vectors (f8-vector->n (vector-map mod2 (apply vector3+ (mapo 'vector f8s))))))
-(check-true (f8==? (f8+ _f8-0 _f8-0) _f8-0))
-(check-true (f8==? (f8+ _f8-0 _f8-1) _f8-1))
-(check-true (f8==? (f8+ _f8-X _f8-0) _f8-X))
-(check-true (f8==? (f8+  _f8-X _f8-1) _f8-X+1))
-(check-true (f8==? (f8+ _f8-0 _f8-X _f8-1 _f8-X2) _f8-X2+X+1))
-(check-true (f8==? (f8+ _f8-X2+X+1 _f8-X2+1) _f8-X))
+(check==? (__f8-0 '+ __f8-0) __f8-0)
+(check==? (__f8-0 '+ __f8-1) __f8-1)
+(check==? (__f8-X '+ __f8-0) __f8-X)
+(check==? (__f8-X '+ __f8-1) __f8-X+1)
+(check==? (__f8-0 '+ __f8-X __f8-X __f8-1 __f8-X2) __f8-X2+1)
+(check==? (__f8-X2+X+1 '+ __f8-X2+1) __f8-X)
 
 ;X^(power1 + power2)
 (define (_f8*powers power1 power2)
   (get-f8-by-power (+ power1 power2)))
-;scalar = 0 or 1
-(define (f8*scalar f8o scalar)
-  (if (equal? scalar 0) _f8-0 f8o))
 
 (define (f8-monomial* coeff1 power1 coeff2 power2)
   (if (or (equal? coeff1 0) (equal? coeff2 0))
