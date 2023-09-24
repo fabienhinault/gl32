@@ -72,6 +72,16 @@
 (define (n->matrix-list n)
   (group-by-n (n->bit-list n 9 '()) 3 '()))
 
+
+(define (matrix->TeX mat)
+  ( ~a "\\pmatrix{"
+       (apply ~a
+              (map
+               (lambda (l3)
+                 (~a (apply ~a l3 #:separator " & ") " \\cr "))
+               (matrix->list* mat)))
+       "}"))
+
 ;#######  #####
 ;#       #     #
 ;#       #     #
@@ -277,6 +287,7 @@
                                 (matrix->vector (gl32-matrix* mat (vector->matrix 3 1 vector3)))))
               (cons '*f8 (λ (this f8o)
                            (array-ref f8-objects (this '*vector3 (f8o 'vector)))))
+              (cons 'TeX (λ (this) (matrix->TeX mat)))
               ))
          (this '())
          (that (λ (symbol . args) (apply (cdr (assoc symbol al)) (cons this args)))))
@@ -365,6 +376,66 @@
 (define (/7bar k l)
   (*7bar k (inv7bar l)))
 
+(define r7 (range 7))
+(define 7bar
+  (let* ((_∞ '())
+         (numbers #[])
+         (inverses #[])
+         (methods
+          (list (cons '∞? (λ (k) (equal? k _∞)))
+                (cons '0? (λ (k) (equal? k (vector-ref numbers 0))))
+                (cons '+ (λ (k l) (if (or (k '∞?) (l '∞?))
+                                      _∞
+                                      (vector-ref numbers(mod7 (+ (k 'k) (l 'k)))))))
+                (cons '* (λ (k l) (cond ((or (and (k '∞?)
+                                                  (not (l '0?)))
+                                             (and (l '∞?)
+                                                  (not (k '0?))))
+                                         _∞)
+                                        ((or (k '∞?) (l '∞?)) ; => other factor is 0
+                                         +nan.0)
+                                        (else (vector-ref numbers (mod7 (* (k 'k) (l 'k))))))))
+                (cons 'inv (λ (k) (if (k '∞?)
+                                      (vector-ref numbers 0)
+                                      (vector-ref inverses (k 'k)))))
+                (cons '/ (λ (k l) (k '* (l 'inv))))
+                ))
+         (ctor (λ (k)
+                 (let* ((this '())
+                        (that (λ (method-sym . args)
+                                (if (equal? method-sym 'k)
+                                    k
+                                    (apply (cdr (assoc method-sym methods)) (cons this args))))))
+                   (set! this that)
+                   this)))
+         )
+    (set! _∞ (ctor ∞))
+    (set! numbers (vector-map ctor (list->vector r7)))
+    (set! inverses (vector-map (λ (_) (vector-ref numbers _)) #[0 1 4 5 2 3 6]))
+    (vector-set! inverses 0 _∞)
+    (λ (number)
+      (if (equal? number ∞)
+          _∞
+          (vector-ref numbers number)))))
+
+(check-equal? ((7bar ∞) '+ (7bar 0)) (7bar ∞))
+(check-equal? ((7bar ∞) '+ (7bar 6)) (7bar ∞))
+(check-equal? ((7bar 0) '+ (7bar 0)) (7bar 0))
+(check-equal? ((7bar 1) '+ (7bar 0)) (7bar 1))
+(check-equal? ((7bar 1) '+ (7bar 6)) (7bar 0))
+
+(check-equal? ((7bar 1) '* (7bar 6)) (7bar 6))
+(check-equal? ((7bar 2) '* (7bar 6)) (7bar 5))
+(check-equal? ((7bar 1) '* (7bar ∞)) (7bar ∞))
+(check-equal? ((7bar 1) '* (7bar 0)) (7bar 0))
+
+
+(check-equal? ((7bar 1) '/ (7bar 6)) (7bar 6))
+(check-equal? ((7bar 2) '/ (7bar 6)) (7bar 5))
+(check-equal? ((7bar 1) '/ (7bar 5)) (7bar 3))
+(check-equal? ((7bar 2) '/ (7bar 5)) (7bar 6))
+(check-equal? ((7bar 1) '/ (7bar ∞)) (7bar 0))
+(check-equal? ((7bar 1) '/ (7bar 0)) (7bar ∞))
 
 ;######   #####  #        #####  #######
 ;#     # #     # #       #     # #    #
@@ -374,7 +445,7 @@
 ;#       #     # #       #         #
 ;#        #####  ####### #######   #
 
-(define r7 (range 7))
+
 (define m2z7 (map (λ (_)(list->matrix 2 2 _))
                   (cartesian-product r7 r7 r7 r7)))
 (define psl27-matrices (filter
@@ -393,8 +464,11 @@
          (d (matrix-ref psl27-matrix 1 1)))
     (λ (k)
       (if (equal? k ∞)
-          (if (equal? c 0) ∞ (/7bar a c))
-          (/7bar (+7bar (*7bar a k) b) (+7bar (*7bar c k) d))))))
+          (if (equal? c 0)
+              ∞
+              (/7bar a c))
+          (/7bar (+7bar (*7bar a k) b)
+                 (+7bar (*7bar c k) d))))))
 
 (define sf2-3663 (sf2 _3663))
 (check-equal? (sf2-3663 0) 2) ; 6/3 = -1*5 = -5 = 2
