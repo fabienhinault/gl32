@@ -14,8 +14,9 @@
   (equal? l '()))
 
 ; map for objects
-(define (mapo symbol l)
-  (map (λ (_) (_ symbol)) l))
+(define (mapo symbol l . arglists)
+  (apply map (list* (λ (_ . args) (apply _ (cons symbol args)))
+                    l arglists)))
 
 (define (filtero predicate-symbol l)
   (filter (λ (_) (_ predicate-symbol)) l))
@@ -31,6 +32,12 @@
 
 (define (vector->list-not-0 v)
   (vector->list (vector-filter (λ (_) (not (equal? 0 _))) v)))
+
+(define (cartesian-power n lst)
+  (apply cartesian-product (build-list n (λ (_) lst))))
+
+(check-equal? (cartesian-power 1 (range 3)) '((0) (1) (2)))
+(check-equal? (cartesian-power 2 (range 3)) '((0 0) (0 1) (0 2) (1 0) (1 1) (1 2) (2 0) (2 1) (2 2)))
 
 ; get a list containing the binary writing of a number n
 ; n the number
@@ -113,11 +120,15 @@
 (define (_f8-object vector symbol power)
   (let* ((get-f8-by-power (λ (k) (if (equal? k ∞)
                                      __f8-0
-                                     (vector-ref _f8-by-powers k))))
-         (f8-monomial* (λ (coeff1 power1 coeff2 power2)
+                                     (vector-ref _f8-by-powers (mod7 k)))))
+         (f8-monomial*_ (λ (coeff1 power1 coeff2 power2)
                          (if (or (equal? coeff1 0) (equal? coeff2 0))
                              __f8-0
                              (get-f8-by-power (+ power1 power2)))))
+         (f8-monomial* (λ (coeffs powers)
+                         (if (member 0 coeffs)
+                             __f8-0
+                             (get-f8-by-power (apply + powers)))))
          (alist (list (cons 'vector (λ (this) vector))
                     (cons 'symbol (λ (this) symbol))
                     (cons 'power (λ (this) power))
@@ -139,14 +150,26 @@
                                             (flatten
                                              (map (λ (i1)
                                                     (map (λ (i2)
-                                                           (f8-monomial* (this 'coeff i1) i1 (other 'coeff i2) i2))
+                                                           (f8-monomial*_ (this 'coeff i1) i1 (other 'coeff i2) i2))
                                                          (range 3)))
                                                   (range 3))))))))
+                    (cons '* (λ f8s
+                               (if (member __f8-0 f8s)
+                                   __f8-0
+                                   (let1 indices-lists
+                                         (cartesian-power (length f8s) (range 3))
+                                          (apply __f8-0
+                                                 (cons
+                                                  '+
+                                                  (map (λ (indices)
+                                                         (f8-monomial* (mapo 'coeff f8s indices) indices))
+                                                       indices-lists)))))))
                     ))
          (this '())
          (that (λ (symbol . args) (apply (cdr (assoc symbol alist)) (cons this args)))))
     (set! this that)
     this))
+
 
 
 (define (f8-object vector symbol power)
@@ -213,7 +236,7 @@
       (vector-ref f8-by-powers k)))
 
 ;vector of f8 objects by powers
-;                             X^0   X^1   X^2    X^3     X^4              X^5        X^6
+;                              X^0   X^1     X^2    X^3     X^4        X^5        X^6
 (set! _f8-by-powers (vector __f8-1 __f8-X __f8-X2 __f8-X+1 __f8-X2+X __f8-X2+X+1 __f8-X2+1))
 (define (_get-f8-by-power k)
   (if (equal? k ∞)
@@ -223,6 +246,19 @@
 (check==? __f8-X2+X+1 (_get-f8-by-power 5))
 (check==? __f8-0 (_get-f8-by-power ∞))
 
+
+(check==? (__f8-0 '* __f8-0) __f8-0)
+(check==? (__f8-0 '* __f8-X2+X+1) __f8-0)
+(check==? (__f8-1 '* __f8-1) __f8-1)
+(check==? (__f8-1 '* __f8-X2+X+1) __f8-X2+X+1)
+(check==? (__f8-X '* __f8-1) __f8-X)
+(check==? (__f8-X '* __f8-X) __f8-X2)
+(check==? (__f8-X2 '* __f8-1) __f8-X2)
+(check==? (__f8-X2 '* __f8-X) __f8-X+1)
+; (X2+X+1)(X2+1) = X4+X2+X3+X+X2+1
+;                = X2+X+X2+X+1+X+X2+1
+;                = X2+X
+(check==? (__f8-X2+X+1 '* __f8-X2+1) __f8-X2+X)
 
 (define f8-decomposition
   (list (cons _f8-0 (list _f8-0))
