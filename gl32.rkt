@@ -401,13 +401,11 @@
                 (cons '/ (λ (k l) (k '* (l 'inv))))
                 ))
          (ctor (λ (k)
-                 (let* ((this '())
-                        (that (λ (method-sym . args)
-                                (if (equal? method-sym 'k)
-                                    k
-                                    (apply (cdr (assoc method-sym methods)) (cons this args))))))
-                   (set! this that)
-                   this)))
+                 (define (this method-sym . args)
+                   (if (equal? method-sym 'k)
+                       k
+                       (apply (cdr (assoc method-sym methods)) (cons this args))))
+                   this))
          )
     (set! _∞ (ctor ∞))
     (set! numbers (vector-map ctor (list->vector r7)))
@@ -470,6 +468,21 @@
           (/7bar (+7bar (*7bar a k) b)
                  (+7bar (*7bar c k) d))))))
 
+
+(define (_sf2 psl27-matrix)
+  (let* ((a (7bar (matrix-ref psl27-matrix 0 0)))
+         (b (7bar (matrix-ref psl27-matrix 0 1)))
+         (c (7bar (matrix-ref psl27-matrix 1 0)))
+         (d (7bar (matrix-ref psl27-matrix 1 1))))
+    (λ (k)
+      (if (k '∞?)
+          (if (c '0?)
+              (7bar ∞)
+              (a '/ c))
+          (((a '* k) '+ b)
+           '/ ((c '* k) '+ d))))))
+
+
 (define sf2-3663 (sf2 _3663))
 (check-equal? (sf2-3663 0) 2) ; 6/3 = -1*5 = -5 = 2
 (check-equal? (sf2-3663 1) 1) ; (3 + 6)/(6 + 3) = 1
@@ -479,6 +492,17 @@
 (check-equal? (sf2-3663 5) 0) ; (5*3 + 6)/(5*6 + 3) = (15 - 1)/(-5 + 3) = 0
 (check-equal? (sf2-3663 6) 6) ; (6*3 + 6)/(6*6 + 3) = (-3 - 1)/(1 + 3) = -1 = 6
 (check-equal? (sf2-3663 ∞) 4) ; 3/6 = -3 = 4
+
+(define _sf2-3663 (_sf2 _3663))
+(check-equal? ((_sf2-3663 (7bar 0)) 'k) 2) ; 6/3 = -1*5 = -5 = 2
+(check-equal? ((_sf2-3663 (7bar 1)) 'k) 1) ; (3 + 6)/(6 + 3) = 1
+(check-equal? ((_sf2-3663 (7bar 2)) 'k) 5) ; (2*3 + 6)/(2*6 + 3) = -2/1 = 5
+(check-equal? ((_sf2-3663 (7bar 3)) 'k) ∞) ; (3*3 + 6)/(3*6 + 3) = 1/0 = ∞
+(check-equal? ((_sf2-3663 (7bar 4)) 'k) 3) ; (4*3 + 6)/(4*6 + 3) = -3/-1 = 3
+(check-equal? ((_sf2-3663 (7bar 5)) 'k) 0) ; (5*3 + 6)/(5*6 + 3) = (15 - 1)/(-5 + 3) = 0
+(check-equal? ((_sf2-3663 (7bar 6)) 'k) 6) ; (6*3 + 6)/(6*6 + 3) = (-3 - 1)/(1 + 3) = -1 = 6
+(check-equal? ((_sf2-3663 (7bar ∞)) 'k) 4) ; 3/6 = -3 = 4
+
 
 (define (__sf2->glf8 sf2)
   (λ (f8o)
