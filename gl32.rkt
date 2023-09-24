@@ -467,7 +467,14 @@
               (/7bar a c))
           (/7bar (+7bar (*7bar a k) b)
                  (+7bar (*7bar c k) d))))))
-
+(define 7bar-nbs (append r7 (list ∞)))
+(define (inf->TeX k)
+  (if (equal? k +inf.0)
+      "\\infty"
+      k))
+(define (sf2->TeX sf2f)
+  (matrix->TeX (list*->matrix (list (map inf->TeX 7bar-nbs)
+                                    (map inf->TeX (map sf2f 7bar-nbs))))))
 
 (define (_sf2 psl27-matrix)
   (let* ((a (7bar (matrix-ref psl27-matrix 0 0)))
@@ -486,7 +493,7 @@
 (define sf2-3663 (sf2 _3663))
 (check-equal? (sf2-3663 0) 2) ; 6/3 = -1*5 = -5 = 2
 (check-equal? (sf2-3663 1) 1) ; (3 + 6)/(6 + 3) = 1
-(check-equal? (sf2-3663 2) 5) ; (2*3 + 6)/(2*6 + 3) = -2/1 = 5
+(check-equal? (sf2-3663 2) 5) ; (2*3 + 6)/(2*6 + 3) = 5/1 = 5
 (check-equal? (sf2-3663 3) ∞) ; (3*3 + 6)/(3*6 + 3) = 1/0 = ∞
 (check-equal? (sf2-3663 4) 3) ; (4*3 + 6)/(4*6 + 3) = -3/-1 = 3
 (check-equal? (sf2-3663 5) 0) ; (5*3 + 6)/(5*6 + 3) = (15 - 1)/(-5 + 3) = 0
@@ -527,6 +534,18 @@
   (gl32-object (gl32-matrix->n (f->gl32-matrix (__sf2->glf8 sf2o)))))
 
 (check==? (sf2->gl32 sf2-3663) _98)
+
+(define (display-matching psl27-matrix)
+ (displayln
+  (~a
+   (matrix->TeX psl27-matrix)
+   "\\quad"
+   (sf2->TeX (sf2 psl27-matrix))
+   "\\quad&"
+   ((sf2->gl32 (sf2 psl27-matrix)) 'TeX)
+   "\\cr")))
+
+(for-each display-matching psl27-matrices)
 
 ;list of cycles as lists of integers
 ;each element is:
