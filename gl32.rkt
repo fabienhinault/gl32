@@ -121,10 +121,6 @@
   (let* ((get-f8-by-power (λ (k) (if (equal? k ∞)
                                      __f8-0
                                      (vector-ref _f8-by-powers (mod7 k)))))
-         (f8-monomial*_ (λ (coeff1 power1 coeff2 power2)
-                         (if (or (equal? coeff1 0) (equal? coeff2 0))
-                             __f8-0
-                             (get-f8-by-power (+ power1 power2)))))
          (f8-monomial* (λ (coeffs powers)
                          (if (member 0 coeffs)
                              __f8-0
@@ -137,32 +133,19 @@
                     (cons '==? (λ (this other) (equal? vector (other 'vector))))
                     (cons 'in-array (λ (this) (array-ref f8-objects vector)))
                     (cons '*scalar (λ (this scalar) (if (equal? 0 scalar) __f8-0 this)))
-                    (cons '+_ (λ (this other) (array-ref f8-objects (vector-map mod2 (vector3+ vector (other 'vector))))))
                     (cons '+ (λ (this . others)
                                (array-ref f8-objects
                                           (apply vector3+%2 (cons vector (mapo 'vector others))))))
-                    (cons '*_ (λ (this other)
-                                (if (or (this '==? __f8-0) (other '==? __f8-0))
-                                    __f8-0
-                                    (apply __f8-0
-                                           (cons
-                                            '+
-                                            (flatten
-                                             (map (λ (i1)
-                                                    (map (λ (i2)
-                                                           (f8-monomial*_ (this 'coeff i1) i1 (other 'coeff i2) i2))
-                                                         (range 3)))
-                                                  (range 3))))))))
-                    (cons '* (λ f8s
-                               (if (member __f8-0 f8s)
+                    (cons '* (λ f8os
+                               (if (member __f8-0 f8os)
                                    __f8-0
                                    (let1 indices-lists
-                                         (cartesian-power (length f8s) (range 3))
+                                         (cartesian-power (length f8os) (range 3))
                                           (apply __f8-0
                                                  (cons
                                                   '+
                                                   (map (λ (indices)
-                                                         (f8-monomial* (mapo 'coeff f8s indices) indices))
+                                                         (f8-monomial* (mapo 'coeff f8os indices) indices))
                                                        indices-lists)))))))
                     ))
          (this '())
@@ -170,39 +153,11 @@
     (set! this that)
     this))
 
-
-
-(define (f8-object vector symbol power)
-  (let1 alist (list (cons 'vector vector)
-                    (cons 'vector-n (f8-vector->n vector))
-                    (cons 'symbol symbol)
-                    (cons 'power power)
-                    (cons 'coeff (λ (i-coeff) (vector-ref vector i-coeff)))
-                    (cons 'coeff==0? (λ (i-coeff) (equal? 0 (vector-ref vector i-coeff))))
-                    (cons '==? (λ (other) (equal? vector (other 'vector))))
-                    (cons 'in-array (λ () (array-ref f8s vector)))
-                    ;(cons '*scalar (λ (scalar) (if (equal? 0 scalar) _f8-0 this)))
-                    )
-        (λ (arg) (cdr (assoc arg alist)))))
 (define (f8==? _1 _2)
   (equal? (_1 'vector) (_2 'vector)))
 
 (define ∞ +inf.0)
 (define inf +inf.0)
-(set! f8s (array #[#[#[(f8-object #[0 0 0] '0 ∞) (f8-object #[0 0 1] 'X2 2)]
-                     #[(f8-object #[0 1 0] 'X 1) (f8-object #[0 1 1] 'X2+X 4)]]
-                   #[#[(f8-object #[1 0 0] '1 0) (f8-object #[1 0 1] 'X2+1 6)]
-                     #[(f8-object #[1 1 0] 'X+1 3) (f8-object #[1 1 1] 'X2+X+1 5)]]]))
-
-(define _f8-0 (array-ref f8s #(0 0 0)))
-(define _f8-1 (array-ref f8s #(1 0 0)))
-(define _f8-X (array-ref f8s #(0 1 0)))
-(define _f8-X2 (array-ref f8s #(0 0 1)))
-(define _f8-X+1 (array-ref f8s #(1 1 0)))
-(define _f8-X2+X (array-ref f8s #(0 1 1)))
-(define _f8-X2+X+1 (array-ref f8s #(1 1 1)))
-(define _f8-X2+1 (array-ref f8s #(1 0 1)))
-
 
 (set! f8-objects (array #[#[#[(_f8-object #[0 0 0] '0 ∞) (_f8-object #[0 0 1] 'X2 2)]
                             #[(_f8-object #[0 1 0] 'X 1) (_f8-object #[0 1 1] 'X2+X 4)]]
@@ -226,14 +181,6 @@
 (check-true (__f8-X2+1 'coeff==0? 1))
 (check-false (__f8-X2+1 'coeff==0? 0))
 (check-false (__f8-X2+1 'coeff==0? 2))
-
-;vector of f8 objects by powers
-;                             X^0   X^1   X^2    X^3     X^4      X^5        X^6
-(define f8-by-powers (vector _f8-1 _f8-X _f8-X2 _f8-X+1 _f8-X2+X _f8-X2+X+1 _f8-X2+1))
-(define (get-f8-by-power k)
-  (if (equal? k ∞)
-      _f8-0
-      (vector-ref f8-by-powers k)))
 
 ;vector of f8 objects by powers
 ;                              X^0   X^1     X^2    X^3     X^4        X^5        X^6
@@ -261,28 +208,6 @@
 ;                = X2+X
 (check==? (__f8-X2+X+1 '* __f8-X2+1) __f8-X2+X)
 
-(define f8-decomposition
-  (list (cons _f8-0 (list _f8-0))
-        (cons _f8-1 (list _f8-1))
-        (cons _f8-X (list _f8-X))
-        (cons _f8-X2 (list _f8-X2))
-        (cons _f8-X+1 (list _f8-1 _f8-X))
-        (cons _f8-X2+X (list _f8-X _f8-X2))
-        (cons _f8-X2+X+1 (list _f8-1 _f8-X _f8-X2))
-        (cons _f8-X2+1 (list _f8-1 _f8-X2))))
-(define (f8-decompose f8)
-  (cdr (assoc f8 f8-decomposition)))
-
-;vector of f8 objects by polynomial coefficients
-;index is vector-n, actually P(2) for polynomial P, but not modulo 2
-(vector-set! f8-vectors 0 _f8-0)
-(for-each
- (λ (_) (vector-set! f8-vectors (_ 'vector-n) _))
- (vector->list f8-by-powers))
-(check-true (f8==? (vector-ref f8-vectors 6) _f8-X2+X))
-
-(define (f8+ . f8s)
-  (vector-ref f8-vectors (f8-vector->n (vector-map mod2 (apply vector3+ (mapo 'vector f8s))))))
 (check==? (__f8-0 '+ __f8-0) __f8-0)
 (check==? (__f8-0 '+ __f8-1) __f8-1)
 (check==? (__f8-X '+ __f8-0) __f8-X)
@@ -290,10 +215,6 @@
 (check==? (__f8-0 '+ __f8-X __f8-X __f8-1 __f8-X2) __f8-X2+1)
 (check==? (__f8-X2+X+1 '+ __f8-X2+1) __f8-X)
 
-(define f8-powers-3d-array
-        (array-map (λ (_) (_ 'power)) f8s))
-
-(check-equal? f8-powers-3d-array (array #[#[#[∞ 2] #[1 4]] #[#[0 6] #[3 5]]]))
 
 
 ; #####  #        #####   #####
@@ -355,7 +276,7 @@
               (cons '*vector3 (λ (this vector3)
                                 (matrix->vector (gl32-matrix* mat (vector->matrix 3 1 vector3)))))
               (cons '*f8 (λ (this f8o)
-                           (array-ref f8s (this '*vector3 (f8o 'vector)))))
+                           (array-ref f8-objects (this '*vector3 (f8o 'vector)))))
               ))
          (this '())
          (that (λ (symbol . args) (apply (cdr (assoc symbol al)) (cons this args)))))
@@ -384,35 +305,37 @@
 
 (check-equal? (length _gl32-objects) 168)
 
-(define gl32-integers (mapo 'n _gl32-objects))
-(check-equal? (length gl32-integers) 168)
+(check==? (_84 '*f8 __f8-0) __f8-0)
+(check==? (_84 '*f8 __f8-1) __f8-X2)
+(check==? (_84 '*f8 __f8-X) __f8-X)
+(check==? (_84 '*f8 __f8-X+1) __f8-X2+X)
+(check==? (_84 '*f8 __f8-X2) __f8-1)
+(check==? (_84 '*f8 __f8-X2+1) __f8-X2+1)
+(check==? (_84 '*f8 __f8-X2+X) __f8-X+1)
+(check==? (_84 '*f8 __f8-X2+X+1) __f8-X2+X+1)
 
-(define (gl32-f8 ogl32 of8)
-  (vector-ref
-   f8-vectors
-   (f8-vector->n (ogl32 '*vector3 (of8 'vector)))))
+(check==? (_85 '*f8 __f8-0) __f8-0)
+(check==? (_85 '*f8 __f8-1) __f8-X2)
+(check==? (_85 '*f8 __f8-X) __f8-X)
+(check==? (_85 '*f8 __f8-X+1) __f8-X2+X)
+(check==? (_85 '*f8 __f8-X2) __f8-X2+1)
+(check==? (_85 '*f8 __f8-X2+1) __f8-1)
+(check==? (_85 '*f8 __f8-X2+X) __f8-X2+X+1)
+(check==? (_85 '*f8 __f8-X2+X+1) __f8-X+1)
 
-(check-true (((_84 '*f8 _f8-0) '==?) _f8-0))
-(check-true (((_84 '*f8 _f8-1) '==?) _f8-X2))
-(check-true (((_84 '*f8 _f8-X) '==?) _f8-X))
-(check-true (((_84 '*f8 _f8-X+1) '==?) _f8-X2+X))
-(check-true (((_84 '*f8 _f8-X2) '==?) _f8-1))
-(check-true (((_84 '*f8 _f8-X2+1) '==?) _f8-X2+1))
-(check-true (((_84 '*f8 _f8-X2+X) '==?) _f8-X+1))
-(check-true (((_84 '*f8 _f8-X2+X+1) '==?) _f8-X2+X+1))
-
-(check-true (((_85 '*f8 _f8-0) '==?) _f8-0))
-(check-true (((_85 '*f8 _f8-1) '==?) _f8-X2))
-(check-true (((_85 '*f8 _f8-X) '==?) _f8-X))
-(check-true (((_85 '*f8 _f8-X+1) '==?) _f8-X2+X))
-(check-true (((_85 '*f8 _f8-X2) '==?) _f8-X2+1))
-(check-true (((_85 '*f8 _f8-X2+1) '==?) _f8-1))
-(check-true (((_85 '*f8 _f8-X2+X) '==?) _f8-X2+X+1))
-(check-true (((_85 '*f8 _f8-X2+X+1) '==?) _f8-X+1))
-
-(define (T-1 ogl32)
+(define (_T-1 ogl32)
   (λ (f7bar-nb)
-    (array-ref f8-powers-3d-array (ogl32 '*vector3 ((get-f8-by-power f7bar-nb) 'vector)))))
+    ((ogl32 '*f8 (_get-f8-by-power f7bar-nb)) 'power)))
+
+(define _T-1-98 (_T-1 _98))
+(check-equal? (_T-1-98 0) 1)
+(check-equal? (_T-1-98 1) 2)
+(check-equal? (_T-1-98 2) 0)
+(check-equal? (_T-1-98 3) 4)
+(check-equal? (_T-1-98 4) 6)
+(check-equal? (_T-1-98 5) 5)
+(check-equal? (_T-1-98 6) 3)
+(check-equal? (_T-1-98 inf) inf)
 
 ;#################
 ;
@@ -483,26 +406,12 @@
 (check-equal? (sf2-3663 6) 6) ; (6*3 + 6)/(6*6 + 3) = (-3 - 1)/(1 + 3) = -1 = 6
 (check-equal? (sf2-3663 ∞) 4) ; 3/6 = -3 = 4
 
-(define (_sf2->glf8-k sf2)
-  (λ (k) (f8+ (get-f8-by-power (sf2 k)) (get-f8-by-power (sf2 ∞)))))
-
 (define (__sf2->glf8 sf2)
   (λ (f8o)
     (let1 k (f8o 'power)
           ((_get-f8-by-power (sf2 k)) '+ (_get-f8-by-power (sf2 ∞))))))
 
-(define _glf8-k-3663 (_sf2->glf8-k sf2-3663))
 (define __glf8-3663 (__sf2->glf8 sf2-3663))
-(define (check-f8==? v1 v2)
-  (check-true (f8==? v1 v2)))
-(check-f8==? (_glf8-k-3663 0) _f8-X)      ; = X^f(0) + X^f(∞) = X^2 + X^4 = X^2 + X^2 + X          = X
-(check-f8==? (_glf8-k-3663 1) _f8-X2)     ; = X^f(1) + X^f(∞) = X + X^4   = X + X^2 + X            = X^2
-(check-f8==? (_glf8-k-3663 2) _f8-1)      ; = X^f(2) + X^f(∞) = X^5 + X^4 = X^2 + X + 1 + X^2 + X  = 1
-(check-f8==? (_glf8-k-3663 3) _f8-X2+X)   ; = X^f(3) + X^f(∞) = X^∞ + X^4 = 0 + X^2 + X            = X^2 + X
-(check-f8==? (_glf8-k-3663 4) _f8-X2+1)   ; = X^f(4) + X^f(∞) = X^3 + X^4 = X + 1 + X^2 + X        = X^2 + 1
-(check-f8==? (_glf8-k-3663 5) _f8-X2+X+1) ; = X^f(5) + X^f(∞) = 1 + X^4   = 1 + X^2 + X            = X^2 + X + 1
-(check-f8==? (_glf8-k-3663 6) _f8-X+1)    ; = X^f(6) + X^f(∞) = X^6 + X^4 = X^2 + 1 + X^2 + X      = X + 1
-(check-f8==? (_glf8-k-3663 ∞) _f8-0)      ; = X^f(∞) + X^f(∞)                                      = 0
 
 (check==? (__glf8-3663 __f8-1) __f8-X)          ; = X^f(0) + X^f(∞) = X^2 + X^4 = X^2 + X^2 + X          = X
 (check==? (__glf8-3663 __f8-X) __f8-X2)         ; = X^f(1) + X^f(∞) = X + X^4   = X + X^2 + X            = X^2
