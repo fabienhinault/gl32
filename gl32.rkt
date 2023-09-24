@@ -255,6 +255,7 @@
 (check==? (__f8-X '* __f8-X) __f8-X2)
 (check==? (__f8-X2 '* __f8-1) __f8-X2)
 (check==? (__f8-X2 '* __f8-X) __f8-X+1)
+(check==? (__f8-X '* __f8-X __f8-X) __f8-X+1)
 ; (X2+X+1)(X2+1) = X4+X2+X3+X+X2+1
 ;                = X2+X+X2+X+1+X+X2+1
 ;                = X2+X
@@ -314,6 +315,7 @@
 (check-true (f8==? (f8* _f8-1 _f8-1) _f8-1))
 (check-true (f8==? (f8* _f8-X _f8-1) _f8-X))
 (check-true (f8==? (f8* _f8-1 _f8-X2) _f8-X2))
+(check-true (f8==? (f8* _f8-X _f8-X2) _f8-X+1))
 ; (X2+X+1)(X2+1) = X4+X2+X3+X+X2+1
 ;                = X2+X+X2+X+1+X+X2+1
 ;                = X2+X
