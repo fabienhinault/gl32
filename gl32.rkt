@@ -329,6 +329,7 @@
 (define (gl32-matrix* m1 m2)
   (matrix-map mod2 (matrix* m1 m2)))
 
+(check-equal? (gl32-matrix* (n->gl32-matrix 1) (n->gl32-matrix 1)) (n->gl32-matrix 1))
 ;;;;;;;
 ; gl32 objects
 
